@@ -1,6 +1,6 @@
 ShelfLister
 
-Copyright 2003-2009, The University of Texas at Arlington ("UTA").
+Copyright 2003-2012, The University of Texas at Arlington ("UTA").
 All rights reserved.
 
 By using this software the USER indicates that he or she 

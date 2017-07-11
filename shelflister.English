@@ -2,7 +2,7 @@ package Lang;
 
 ###############################################################################
 #                                                                             #
-#  ShelfLister, Version 2.0 for Unix                                          #
+#  ShelfLister, Version 3.0 for iPad                                          #
 #                                                                             #
 #  Language module: English                                                   #
 #                                                                             #
@@ -15,7 +15,7 @@ package Lang;
 #                                                                             #
 ###############################################################################
 #                                                                             #
-#  Copyright 2003-2009, The University of Texas at Arlington ("UTA").         #
+#  Copyright 2003-2012, The University of Texas at Arlington ("UTA").         #
 #  All rights reserved.  See included shelflister.LICENSE for details.        #
 #                                                                             #
 ###############################################################################
@@ -97,14 +97,17 @@ $string_prev     = decode_utf8("Previous");
 
 $string_search_h1        = decode_utf8("Get a Shelf List");
 $string_bc_legend        = decode_utf8("By Barcode");
-$string_bc_start         = decode_utf8("Barcode start:");
-$string_bc_end           = decode_utf8("Barcode end:");
+$string_bc_start         = decode_utf8("Starting barcode:");
+$string_bc_end           = decode_utf8("Ending barcode:");
 $string_callno_legend    = decode_utf8("By Call Number");
-$string_callno_start     = decode_utf8("Call number start:");
-$string_callno_end       = decode_utf8("Call number end:");
+$string_callno_start     = decode_utf8("Starting call number:");
+$string_callno_end       = decode_utf8("Ending call number:");
 $string_callno_location  = decode_utf8("Location:");
-$string_callno_class     = decode_utf8("Classification:");
+$string_callno_class     = decode_utf8("Call number classification:");
+$string_lib_of_congress  = decode_utf8("Library of Congress");
+$string_dewey_decimal    = decode_utf8("Dewey Decimal");
 $string_form_submit      = decode_utf8("Get List");     
+$string_mark_submit      = decode_utf8("Submit");     
 
 ##########################################################
 #  Shelf List 
@@ -114,6 +117,7 @@ $string_shelf_list       = decode_utf8("Shelf List");
 $string_shelf_list_table = decode_utf8("This table is a shelf list with selected data.");
 $string_location         = decode_utf8("Location:");
 $string_call_no          = decode_utf8("Call Numbers");
+$string_item_data        = decode_utf8("item data");
 $string_call_no_blurb    = decode_utf8("Switch to Call Numbers display");
 $string_titles           = decode_utf8("Titles");
 $string_titles_blurb     = decode_utf8("Switch to Titles display");
@@ -165,7 +169,7 @@ $string_checkbox         = decode_utf8("Select to mark or mail");
 ##########################################################
 
 $string_item_view          = decode_utf8("Item View");
-$string_back               = decode_utf8("&lt; Back");
+$string_back               = decode_utf8("Back");
 $string_mark_status_label  = decode_utf8("Mark as:");
 $string_barcode            = decode_utf8("barcode");
 $string_item_note          = decode_utf8("Item note");
@@ -174,6 +178,8 @@ $string_no_item_record     = decode_utf8("No item record");
 $voyager_record_link_text  = decode_utf8("Catalog");
 $worldcat_record_link_text = decode_utf8("WorldCat");
 $google_record_link_text   = decode_utf8("Google Books");
+$string_callno_label       = decode_utf8("All locations:");
+$string_callno_browse      = decode_utf8("Call number browse");
 
 ##########################################################
 #  Error messages 

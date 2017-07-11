@@ -1,6 +1,6 @@
 #!/m1/shared/bin/perl
 
-# Utility to check for ShelfLister 2.0 prerequisites
+# Utility to check for ShelfLister 3.0 prerequisites
 
 use strict;
 

@@ -1,0 +1,224 @@
+ShelfLister
+
+Copyright 2003-2012, The University of Texas at Arlington 
+
+Written by Michael Doran, doran@uta.edu
+UT Arlington Library, Box 19497, Arlington, TX 76019, USA
+
+See also:  http://rocky.uta.edu/doran/shelflister/
+
+"Voyager" and "WebVoyage" are trademarks of Ex Libris 
+
+
+|-----------------------------------------------------------|
+|  Installation Instructions                                |
+|-----------------------------------------------------------|
+
+
+Prerequisites
+-------------
+  
+  ShelfLister should run on any Unix server that has:
+    -- a webserver (e.g. Apache) configured to run CGI scripts
+    -- an Oracle database *or* an Oracle client
+    -- Perl 5.8 or later
+    -- the Perl DBI and DBD::Oracle modules
+
+  For Voyager ILS customers, your Voyager database server should
+  meet all the above requirements.  If you have a split server
+  arrangement, your Voyager application server (e.g. a WebVoyage
+  server) *might* work, provided an Oracle client and the
+  Perl DBD::Oracle module has been installed.  
+
+  Note that the Voyager 7 Apache webserver, as setup for Tomcat 
+  WebVoyage, probably isn't configured to run CGI scripts. 
+
+  In these installation instructions, replace {xxxdb} in the path
+  names with your database name.
+
+  This installation should be done while logged into the server as
+  the "voyager" user.  However there may be some Apache config tasks
+  that require root access. 
+
+
+Installation steps 
+------------------
+
+  Download shelflister-3.0.zip and FTP in binary mode to your 
+  Unix server. 
+
+  Unzip:
+
+	unzip shelflister-3.0.zip
+
+  The zip archive should contain the following files:
+
+	./shelflister-3.0/INSTALL.txt
+	./shelflister-3.0/LICENSE.txt
+	./shelflister-3.0/ShelfLister.cgi
+	./shelflister-3.0/ShelfLister.English
+	./shelflister-3.0/ShelfLister.ini
+	./shelflister-3.0/touch-icon-ipad-72.png
+	./shelflister-3.0/misc/dope.sh
+	./shelflister-3.0/misc/prereqs.pl
+	./shelflister-3.0/misc/README.txt
+	./shelflister-3.0/webadmin/index.html
+	./shelflister-3.0/webadmin/README.txt
+	./shelflister-3.0/webadmin/shelflisterfiles.cgi
+
+  	The dope.sh and prereqs.pl scripts are for doing diagnostics
+	and are not a part of the ShelfLister application.
+
+        The files in the webadmin directory are for optionally 
+        utilizing WebAdmin to download Marked Item files.
+
+        Note that ShelfLister 3.0 *does* utilize JavaScript, CSS and 
+        image files (mainly jQuery Mobile); however those files are
+        remotely hosted.  For more information on these CDN-hosted 
+        files, see http://jquerymobile.com/download/ and
+        http://en.wikipedia.org/wiki/Content_Delivery_Network 
+
+  File ownerships and permissions
+
+	If the files don't unzip with the correct ownerships 
+	and permissions, please make them look like this: 
+
+	-rwxr--r--   voyager  exlibris   ...	dope.sh
+	-rwxr--r--   voyager  exlibris   ...	prereqs.pl
+	-rwxr-xr-x   voyager  exlibris   ...	ShelfLister.cgi
+	-rw-r--r--   voyager  exlibris   ...	ShelfLister.ini
+	-rw-r--r--   voyager  exlibris   ...	ShelfLister.English
+	-rwxr-xr-x   voyager  exlibris   ...    webadmin/shelflisterfiles.cgi
+        
+
+  Installation locations
+
+        The ShelfLister.cgi script can be placed in whatever directory is
+	appropriate for CGI scripts according to how *YOUR* webserver is 
+	configured.  The suggestions below are just that -- suggestions. 
+	
+	For instance, if you are running Apache for the *classic* 
+	WebVoyage all of the ShelfLister files could go here:
+
+	/m1/voyager/{xxxdb}/webvoyage/cgi-bin/ShelfLister.cgi
+	                                    ./ShelfLister.ini
+	                                    ./ShelfLister.English
+
+	If you are running Apache for *Tomcat* WebVoyage, then
+        it does not come configured to run CGI scripts, at least
+        not under the Tomcat filesystem.  You may have to do the
+	Apache CGI configuration yourself (see instructions below).
+
+        Under Tomcat, it is recommended that the main shelflister script
+        go here:
+
+	/m1/voyager/{xxxdb}/tomcat/vwebv/context/vwebv/htdocs/vwebv/ShelfLister.cgi
+
+	...and the ShelfLister config files here:
+	/m1/voyager/{xxxdb}/tomcat/vwebv/context/vwebv/shelflister/ShelfLister.ini
+	/m1/voyager/{xxxdb}/tomcat/vwebv/context/vwebv/shelflister/ShelfLister.English
+
+	These directories may have to be created.
+
+        If you already have a ./vwebv/context/vwebv/newbooks directory, you
+        can put the ShelfLister.ini and ShelfLister.English files there.
+
+        If you put the ShelfLister.cgi script in a different location, you might
+        have to edit the script to change where it looks for the config files. 
+
+        Add the iPad icon image file, touch-icon-ipad-72.png to the same directory
+        that the ShelfLister.cgi file is in, e.g.:
+        .../vwebv/context/vwebv/htdocs/vwebv/touch-icon-ipad-72.png
+
+	*RECHECK* file permissions and ownerships AFTER the
+	files are copied/moved to their installation directories.
+
+
+Testing and configuration steps
+-------------------------------
+
+  1) Configure Apache for CGI
+	If your webserver (e.g. Apache) is not already configured 
+	to run CGI scripts, do that first.
+        See: http://rocky.uta.edu/doran/vwebv/addcgi.html
+             for more detailed instructions
+
+  2) Configure ShelfLister
+	Read the configuration comments in the ShelfLister.ini script
+	and edit the "REQUIRED CONFIGURATION" parameters.
+
+  3) Test
+	Point a browser to the ShelfLister script, e.g.:
+
+	http://yourserver.univ.edu/vwebv/ShelfLister.cgi
+          -- or --
+	http://yourserver.univ.edu/cgi-bin/ShelfLister.cgi
+
+	You should see the ShelfLister barcode entry form.  
+
+	If you see the ShelfLister.cgi Perl code, then the
+	Apache CGI configuration (step 1) was not successful.
+
+        ShelfLister 3.0 is designed to provide informational
+	error messages via the browser.  If you get an error
+	message, it should indicate what the problem is.
+ 
+  4) Optional configuration
+	Go back and make any other desired configuration changes in 
+	the ShelfLister.ini and/or ShelfLister.English files  
+
+        If you want your staff to be able to download Marked Item
+        files via WebAdmin, then read the README file in the webadmin
+        directory of the ShelfLister distribution.
+
+  5) Use 
+
+
+=============
+Miscellaneous
+=============
+
+Free advice
+-----------
+
+	As you edit the ShelfLister.ini and/or the ShelfLister.English
+	configuration files/scripts, make sure you make backup copies.  
+	That way if some configuration change renders Shelf Lister 
+	unexecutable and you can't figure out how to fix it, you can 
+	always backtrack to a previous working copy.
+
+
+Bug Reports
+-----------
+
+	Please report bugs or installation problems to:
+
+	Michael Doran
+	email: doran@uta.edu
+	telephone: 1.817.272.5326
+	telephone: 1.888.565.9023 x25326 (toll-free in U.S.)
+
+
+Support
+-------
+
+	I am a Systems Librarian with a full time job quite apart from 
+	creating, enhancing, documenting, distributing, and supporting 
+	ShelfLister.  Please keep that in mind and thoroughly read
+	these installation instructions and the program comments 
+	before contacting me for help.  Considerable effort has gone
+	into the documentation, and chances are good that the answer
+	to your question is contained there.  
+
+	This is not meant to discourage you from contacting me,
+	particularly in regard to bugs or issues that may impact other 
+	users of the software.  I am also very interested in hearing 
+	how the installation instructions and other documentation can
+	be made clearer or otherwise improved.
+
+
+That's all folks!
+-----------------
+
+	Good luck and thanks for choosing ShelfLister.  :-)
+

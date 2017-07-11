@@ -2,9 +2,9 @@
 
 ########################################################################
 #
-#  ShelfLister  -  development build 90926.13b
+#  ShelfLister
 #
-#  Version: 2.0 release candidate for Unix
+#  Version: 3.0 for tablets, optimized for iPads
 #
 #  Created by Michael Doran
 #    doran@uta.edu
@@ -15,7 +15,7 @@
 #
 ########################################################################
 #  
-#  Copyright 2003-2009, The University of Texas at Arlington ("UTA").
+#  Copyright 2003-2012, The University of Texas at Arlington ("UTA").
 #  All rights reserved.
 #
 #  By using this software the USER indicates that he or she 
@@ -66,9 +66,11 @@
 
 # 2009-07-01  Removed mouse-over toggle but left the omoo code in place
 
-#  Best practices.  ;-)
-
 use strict;
+
+unless (eval "use CGI") {
+    ErrorConfig("fatal", "Missing Perl module", "$@") if $@;
+}
 
 unless (eval "use Encode") {
     ErrorConfig("fatal", "Missing Perl module", "$@") if $@;
@@ -92,16 +94,20 @@ use Fcntl qw(:flock);
 use File::Copy "cp";
 
 # Relative path to directories for putting the configuration files:
-#  -- shelflister.ini
-#  -- shelflister.English
+#  -- ShelfLister.ini
+#  -- ShelfLister.English
 use lib '../../newbooks';
 use lib '../../shelflister';
 
 # Read in base configuration file
-#require "shelflister.ini";
-unless (eval qq(require "shelflister.ini")) {
+#require "ShelfLister.ini";
+unless (eval qq(require "ShelfLister.ini")) {
     ErrorConfig("fatal", "Couldn't load required config file", "$@");
 } 
+
+# These are currently only used for development
+my $css_file     = 'ipad.css';
+my $css_file_rtl = 'ipad-rtl.css';
 
 # Voyager SID
 $ENV{ORACLE_SID} = "$ShelfListerIni::oracle_sid";
@@ -143,7 +149,7 @@ my $report_dir   = "$ShelfListerIni::output_directory";
 
 #  ShelfLister is designed so that you can setup multiple
 #  instances for different projects.  This is usually done
-#  by copying the shelflister.cgi script and giving it a
+#  by copying the ShelfLister.cgi script and giving it a
 #  different name.  The "marked items" file will be given
 #  the same name, but with a ".txt" file extension.
 
@@ -157,7 +163,7 @@ my $out_file     = fileparse("$this_script", qr/\.[^.]*/) . ".txt";
 my $this_app      = "ShelfLister";
 #my $this_app_link = qq(<a href="$this_script?show=s1\&$ENV{'QUERY_STRING'}">$this_app</a>);
 my $this_app_link = qq(<a href="$this_script">$this_app</a>);
-my $version       = "2.0 Unix";
+my $version       = "3.0";
 
 
 ######################################
@@ -189,93 +195,26 @@ my $update_ok = "no";
 ########################################################################
 
 
-#  Parse form data 
+#my $doc_type_def = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+#            "http://www.w3.org/TR/html4/loose.dtd">';
 
-my %formdata;
+my $doc_type_def = '<!DOCTYPE HTML>';
 
-my $doc_type_def = '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
-            "http://www.w3.org/TR/html4/loose.dtd">';
-
-my @checked_records;
-
-ReadParse();
-
-##########################################################
-#  ReadParse
-##########################################################
-#
-#  ReadParse reads in and parses the CGI input.
-#  It reads  / QUERY_STRING ("get"  method)
-#            \    STDIN     ("post" method)
-
-sub ReadParse {
-    my ($meth, $formdata, $pair, $name, $value);
-
-    # Retrieve useful ENVIRONMENT VARIABLES
-    $meth = $ENV{'REQUEST_METHOD'};
-
-    # If method unspecified or if method is GET
-    if ($meth eq  '' || $meth eq 'GET') {
-        # Read in query string
-        $formdata = $ENV{'QUERY_STRING'};
-    }
-    # If method is POST
-    elsif ($meth eq 'POST') {
-        read(STDIN, $formdata, $ENV{'CONTENT_LENGTH'});
-    }
-    else {
-        die "Unknown request method: $meth\n";
-    }
-
-    # name-value pairs are separated and put into a list array
-    my @pairs = split(/&/, $formdata);
-
-    foreach $pair (@pairs) {
-        # names and values are split apart
-        ($name, $value) = split(/=/, $pair);
-        # pluses (+'s) are translated into spaces
-        $value =~ tr/+/ /;
-        # hex values (%xx) are converted to alphanumeric
-        $name  =~ s/%([a-fA-F0-9][a-fA-F0-9])/pack("C", hex($1))/eg;
-        $value =~ s/%([a-fA-F0-9][a-fA-F0-9])/pack("C", hex($1))/eg;
-        # The code below attempts to ferret out shell meta-characters
-        # in the form input.  It replaces them with spaces.
-        # looking for the presence of shell meta-characters in $name
-        $name  =~ s/[{}\!\$;><&\*'\|]/ /g;
-        # looking for the presence of shell meta-characters in $value
-        $value =~ s/[{}\!\$;><&\*'\|]/ /g;
-        if ($name eq "check") {
-            @checked_records = (@checked_records, "$value");
-        } else {
-            # associative array of names and values created
-            $formdata{$name} = $value;
-        }
-    }
-    # De-dup and sort the list of checked records
-    if (@checked_records) {
-        my @uniq;
-        my %seen = ();
-        foreach my $i (@checked_records) {
-            push (@uniq, $i) unless $seen{$i}++;
-        }
-        @checked_records = (sort { $a <=> $b } @uniq);
-    }
-}
-
+my $query = new CGI;
 
 ##########################################################
 #  Assign form data to variables.
 ##########################################################
 
 # Language of user interface
-my $language            = decode_utf8($formdata{'lang'});
+my $language            = decode_utf8($query->param('lang'));
 
 LoadLanguageModule($language);
 
 my $back_button = '';
 
 if ($ShelfListerIni::back_button eq "Y") {
-    $back_button = qq(<input type="button" value="$Lang::string_back" class="button" onClick="history.go\(-1\);">);
+    $back_button = qq(<input type="button" data-icon="arrow-l" data-inline="true" value="$Lang::string_back" onClick="history.go\(-1\);">);
 }
 
 my @save_stati;
@@ -286,83 +225,90 @@ if (@Lang::save_stati) {
 }
  
 my $list_display        = '';
-$list_display           = decode_utf8($formdata{'mode'});
+$list_display           = decode_utf8($query->param('mode'));
 if (! $list_display) {
     $list_display        = $ShelfListerIni::list_display_default;
 }
 
-my $mouse_over          = decode_utf8($formdata{'omoo'});
+my $mouse_over          = decode_utf8($query->param('omoo'));
 
 # Input from Search Form 1 - Barcode entry
 
-my $barcode_start       = decode_utf8($formdata{'bcs'});
-my $barcode_end         = decode_utf8($formdata{'bce'});
+my $barcode_start       = decode_utf8($query->param('bcs'));
+my $barcode_end         = decode_utf8($query->param('bce'));
 
 # Input from Search Form 2 - Call Number entry
 
-my $location_id         = decode_utf8($formdata{'loc_id'});
-my $call_num_start      = decode_utf8($formdata{'cns'});
-my $call_num_end        = decode_utf8($formdata{'cne'});
+my $location_id         = decode_utf8($query->param('loc_id'));
+my $call_num_start      = decode_utf8($query->param('cns'));
+my $call_num_end        = decode_utf8($query->param('cne'));
+my $classification      = decode_utf8($query->param('class_type'));
+unless ($classification) {
+    $classification     = 'LC';
+}
 
 # Input from both Search Forms
 
-my $search_type         = decode_utf8($formdata{'search'});
-my $show_charge_stats   = decode_utf8($formdata{'charges'});
-my $show_browse_stats  	= decode_utf8($formdata{'browses'});
-my $show_item_status    = decode_utf8($formdata{'status'});
-my $show_callno_plus    = decode_utf8($formdata{'cnplus'});
-my $show_boxes          = decode_utf8($formdata{'boxes'});
-my $starting_pnt        = decode_utf8($formdata{'stpt'});
+my $search_type         = decode_utf8($query->param('search'));
+my $show_boxes          = decode_utf8($query->param('boxes'));
+my $starting_pnt        = decode_utf8($query->param('stpt'));
+
+# Formerly Search Forms input; now ini file config
+
+my $show_charge_stats   = decode_utf8($ShelfListerIni::charges);
+my $show_browse_stats  	= decode_utf8($ShelfListerIni::browses);
+my $show_item_status    = decode_utf8($ShelfListerIni::status);
+
+my $show_callno_plus    = decode_utf8($query->param('cnplus'));
+if ($show_callno_plus ne 'Y' && $show_callno_plus ne 'N') {
+    $show_callno_plus    = decode_utf8($ShelfListerIni::cnplus);
+}
+
 $starting_pnt =~ s/\D//g;
 
 # Input from Random Test 
-my $random_item_id      = $formdata{'itemid'};
+my $random_item_id      = $query->param('itemid');
 
 #  Browser detection
 #  This part could use some more work.
 
 my $device              = '';
-my $browser             = '';
 my $user_agent          = $ENV{'HTTP_USER_AGENT'};
-my $recs_per_page;
-#  Check for type of browser
-if ($user_agent =~ /iphone/i) { 
-    $recs_per_page       = "50";
-    $device              = "iphone";
-} elsif ($user_agent =~ /NetFront/i
-      || $user_agent =~ /PalmSource/i
-   ) {
-    $recs_per_page       = "50";
-    $device              = "palm";
-} else {
-    $recs_per_page       = "50";
-}
-
-if ($user_agent =~ /Chrome/i) { 
-    $browser             = 'chrome';
-}
+my $recs_per_page       = $ShelfListerIni::recs_per_page;
 
 my $ending_pnt          = $starting_pnt + $recs_per_page - 1;
 
 # Input for Item View
 
-my $record_type         = decode_utf8($formdata{'record_type'});
-my $record_number       = decode_utf8($formdata{'record_no'});
+my $record_type         = decode_utf8($query->param('record_type'));
+my $record_number       = decode_utf8($query->param('record_no'));
 
 # Input for misc. views
 
-my $topic               = decode_utf8($formdata{'topic'});
-my $show_page           = decode_utf8($formdata{'show'});
+my $topic               = decode_utf8($query->param('topic'));
+my $show_page           = decode_utf8($query->param('show'));
+my @checked_records     = decode_utf8($query->param('check'));
+
+# De-dup and sort the list of checked records
+# (Legacy code, not currently used in ShelfLister.)
+if (@checked_records) {
+    my @uniq;
+    my %seen = ();
+    foreach my $i (@checked_records) {
+        push (@uniq, $i) unless $seen{$i}++;
+    }
+    @checked_records = (sort { $a <=> $b } @uniq);
+}
 
 # Input for saving to file
 
-my $save_action              = decode_utf8($formdata{'save_action'});
-my $save_status              = decode_utf8($formdata{'save_status'});
-my $save_bib_id              = decode_utf8($formdata{'save_bib_id'});
-my $save_mfhd_id             = decode_utf8($formdata{'save_mfhd_id'});
-my $save_item_id             = decode_utf8($formdata{'save_item_id'});
-my $save_barcode             = decode_utf8($formdata{'save_barcode'});
-my $save_call_no             = decode_utf8($formdata{'save_call_no'});
+my $save_action              = decode_utf8($query->param('save_action'));
+my $save_status              = decode_utf8($query->param('save_status'));
+my $save_bib_id              = decode_utf8($query->param('save_bib_id'));
+my $save_mfhd_id             = decode_utf8($query->param('save_mfhd_id'));
+my $save_item_id             = decode_utf8($query->param('save_item_id'));
+my $save_barcode             = decode_utf8($query->param('save_barcode'));
+my $save_call_no             = decode_utf8($query->param('save_call_no'));
 
 if      ($show_page eq 's1') {
     PrintSearchForm("s1");
@@ -394,7 +340,6 @@ if      ($show_page eq 's1') {
 } else {
     $show_page = "s1";
     PrintSearchForm("s1");
-    #PrintHomePage();
 }
 
 ##########################################################
@@ -421,22 +366,6 @@ sub LoadLanguageModule {
 
 
 ##########################################################
-#  PrintHomePage 
-##########################################################
-#
-#  Deprecated in v.2.0  
-#  Default page is barcode search
-
-sub PrintHomePage {
-    PrintHead();
-    print encode_utf8(qq(
-    <h1>Deprecated</h1>
-    ));
-    PrintTail();
-}
-
-
-##########################################################
 #  PrintSearchForm 
 ##########################################################
 #
@@ -448,17 +377,24 @@ sub PrintSearchForm {
     my $s1_tab = "";
     my $s2_tab = "";
     if ($form eq "s2") {
-        $s1_tab     = qq(<li class="off"><a href="$this_script?show=s1">$Lang::string_bc_legend</a></li>);
-        $s2_tab     = qq(<li class="on">$Lang::string_callno_legend</li>);
+        $s1_tab     = qq(<a data-role="button" href="$this_script?show=s1">$Lang::string_bc_legend</a>);
+        $s2_tab     = qq(<span data-role="button" class="ui-btn-active">$Lang::string_callno_legend</span>);
     } else {
-        $s1_tab     = qq(<li class="on">$Lang::string_bc_legend</li>);
-        $s2_tab     = qq(<li class="off"><a href="$this_script?show=s2">$Lang::string_callno_legend</a></li>);
+        $s1_tab     = qq(<span data-role="button" class="ui-btn-active">$Lang::string_bc_legend</span>);
+        $s2_tab     = qq(<a data-role="button" href="$this_script?show=s2">$Lang::string_callno_legend</a>);
     }
+# $s2_tab     = qq(<li><a class="ui-btn-active" href="$this_script?show=s2">$Lang::string_callno_legend</a></li>);
 
     ConnectVygrDB();
 
+    my $location_field = 'location_name';
+
+    if ($ShelfListerIni::location_name_option eq 'F') {
+        $location_field = 'location_display_name';
+    }
+
     # Prepare the first prelimary SQL statement
-    my $sth = $dbh->prepare("select location_id, location_name from $db_name.location where suppress_in_opac not in 'Y'") 
+    my $sth = $dbh->prepare("select location_id, $location_field from $db_name.location where suppress_in_opac not in 'Y' and $location_field is not null and mfhd_count > 1") 
 	|| die $dbh->errstr;
 
     # Run the SQL query
@@ -479,77 +415,39 @@ sub PrintSearchForm {
     if ($mouse_over) {
         $hidden_inputs .= qq(<input type="hidden" name="omoo" value="$mouse_over">\n);
     }
-    if ($show_callno_plus) {
-        $hidden_inputs .= qq(<input type="hidden" name="cnplus" value="$show_callno_plus">\n);
-    }
 
     PrintHead("$Lang::string_search_h1");
 
     print qq(
-      <h1>$Lang::string_search_h1</h1>
+      <h2>$Lang::string_search_h1</h2>
 
-      <div class="tabsContainer">
-        <ul class="tabs">
-            $s1_tab
-            $s2_tab
-        </ul>
+      <div data-role="controlgroup" data-type="horizontal" class="center">
+          $s1_tab$s2_tab
       </div>
     );
 
     if ($form eq "s1") {
         print encode_utf8(qq(
-      <div class="formOn">
+      <div>
 	<form name="barcode" action="$this_script" method="get" accept-charset="UTF-8">
+          <div>
 	    <input type="hidden" name="search" value="s1">
-	  <div>
+          </div>
+
+          <div data-role="fieldcontain">
             <label for="bcStart">$Lang::string_bc_start</label>
+            <input id="bcStart" type="search" name="bcs" value="" size="20" autofocus>
           </div>
-	  <div class="inputStyle">
-            <input id="bcStart" type="text" name="bcs" value="" size="20">
-          </div>
-	  <div>
+
+          <div data-role="fieldcontain">
             <label for="bcEnd">$Lang::string_bc_end</label>
+            <input id="bcEnd" type="search" name="bce" value="" size="20">
           </div>
-	  <div class="inputStyle">
-            <input id="bcEnd" type="text" name="bce" value="" size="20">
+
+          <div class="center">
+	    <input type="submit" class="button" data-inline="true" value="$Lang::string_form_submit">
           </div>
-          <div class="formCheckBoxes">
-        ));
-        my $checked_box = '';
-        if ($show_charge_stats eq 'Y') {
-            $checked_box = qq(checked="checked");
-        } else {
-            $checked_box = '';
-        }
-        print encode_utf8(qq(
-	    <input type="checkbox" name="charges" id="charges" class="checkbox" value="Y" $checked_box><label for="charges">$Lang::string_ch_full</label><br>
-        ));
-        $checked_box = '';
-        if ($show_browse_stats eq 'Y') {
-            $checked_box = qq(checked="checked");
-        } else {
-            $checked_box = '';
-        }
-        print encode_utf8(qq(
-	    <input type="checkbox" name="browses" id="browses" class="checkbox"  value="Y" $checked_box><label for="browses">$Lang::string_br_full</label><br>
-        ));
-    $checked_box = '';
-        if ($show_item_status eq 'Y') {
-            $checked_box = qq(checked="checked");
-        } else {
-            $checked_box = '';
-        }
-        print encode_utf8(qq(
-	    <input type="checkbox" name="status" id="status" class="checkbox" value="Y" $checked_box><label for="status">$Lang::string_st_full</label>
-        ));
-	   # <input type="checkbox" name="boxes" id="boxes" class="checkbox" value="Y"><a href="$this_script?show=help&amp;topic=boxes"><label for="boxes">place holders</label></a>
-        $checked_box = '';
-        print encode_utf8(qq(
-          </div>
-          <div class="formSubmit">
-	    <input type="submit" class="button" value="$Lang::string_form_submit">
-          </div>
-          <div class="clear">
+          <div>
 	    <input type="hidden" name="stpt" value="1">
             $hidden_inputs
           </div>
@@ -559,28 +457,14 @@ sub PrintSearchForm {
     }
     if ($form eq "s2") {
         print encode_utf8(qq(
-      <div class="formOn">
+      <div>
 	<form name="callNumber" action="$this_script" method="get" accept-charset="UTF-8">
 	    <input type="hidden" name="search" value="s2">
-	  <div>
-            <label for="callnoStart">$Lang::string_callno_start</label>
-          </div>
-	  <div class="inputStyle">
-             <input id="callnoStart" type="text" name="cns" value="" size="20">
-          </div>
-	  <div>
-            <label for="callnoEnd">$Lang::string_callno_end</label>
-          </div>
-	  <div class="inputStyle">
-            <input id="callnoEnd" type="text" name="cne" value="" size="20">
-          </div>
         ));
         print encode_utf8(qq(
-	  <div>
+          <div data-role="fieldcontain">
             <label for="loc_id">$Lang::string_callno_location</label>
-          </div>
-          <div>
-          <select name="loc_id" id="loc_id">
+            <select name="loc_id" id="loc_id">
         ));
         my @sorted = sort (keys %location_list);
         foreach my $key (@sorted) {
@@ -599,47 +483,43 @@ sub PrintSearchForm {
             ));
         }
         print encode_utf8(qq(
-          </select>
+            </select>
           </div>
-	  <div>
-            <label for="callnoClass">$Lang::string_callno_class</label>
+
+          <div data-role="fieldcontain">
+            <label for="callnoStart">$Lang::string_callno_start</label>
+            <input type="search" id="callnoStart" name="cns" value="" size="20" autofocus>
           </div>
-	  <div>
-          <select id="callnoClass" name="class_type">
-	    <option value="LC">Library of Congress</option>
-	  </select>
+
+          <div data-role="fieldcontain">
+            <label for="callnoEnd">$Lang::string_callno_end</label>
+            <input type="search" id="callnoEnd" name="cne" value="" size="20">
           </div>
-          <div class="formCheckBoxes">
+
+          <div data-role="fieldcontain">
+            <fieldset data-role="controlgroup">
+            <legend>$Lang::string_callno_class</legend>
         ));
-        my $checked_box = '';
-        if ($show_charge_stats eq 'Y') {
-            $checked_box = qq(checked="checked");
-        } else {
-            $checked_box = '';
+           # <label for="callnoClass">$Lang::string_callno_class</label>
+        my $checked_radio = '';
+        if ($classification eq 'LC') {
+            $checked_radio = 'checked="checked"';
         }
         print encode_utf8(qq(
-	    <input type="checkbox" name="charges" id="charges" class="checkbox" value="Y" $checked_box><label for="charges">$Lang::string_ch_full</label><br>
+	    <input title="callnoClass" type="radio" name="class_type" $checked_radio value="LC" id="radio-lc" /><label for="radio-lc">$Lang::string_lib_of_congress</label>
         ));
-        $checked_box = '';
-        if ($show_browse_stats eq 'Y') {
-            $checked_box = qq(checked="checked");
-        } else {
-            $checked_box = '';
+        $checked_radio = '';
+        if ($classification eq 'DD') {
+            $checked_radio = 'checked="checked"';
         }
         print encode_utf8(qq(
-	    <input type="checkbox" name="browses" id="browses" class="checkbox" value="Y" $checked_box><label for="browses">$Lang::string_br_full</label><br>
+	    <input title="callnoClass" type="radio" name="class_type" $checked_radio value="DD" id="radio-dd" /><label for="radio-dd">$Lang::string_dewey_decimal</label>
         ));
-        $checked_box = '';
-        if ($show_item_status eq 'Y') {
-            $checked_box = qq(checked="checked");
-        } else {
-            $checked_box = '';
-        }
         print encode_utf8(qq(
-	    <input type="checkbox" name="status" id="status" class="checkbox" value="Y" $checked_box><label for="status">$Lang::string_st_full</label>
+            </fieldset>
           </div>
-          <div class="formSubmit">
-	    <input type="submit" class="button" value="$Lang::string_form_submit">
+          <div class="center">
+	    <input type="submit" class="button" data-inline="true" value="$Lang::string_form_submit">
           </div>
           <div class="clear">
 	    <input type="hidden" name="stpt" value="1">
@@ -648,7 +528,6 @@ sub PrintSearchForm {
 	</form>
       </div>
         ));
-	    #<input type="checkbox" name="boxes" id="boxes" class="checkbox" value="Y"><a href="$this_script?show=help&amp;topic=boxes"><label for="boxes">place holders</label></a>
     }
     PrintTail();
     exit (0);
@@ -862,6 +741,51 @@ sub NormalizeLC {
 
 
 ##########################################################
+#  NormalizeDewey
+##########################################################
+
+sub NormalizeDewey {
+    my ($dewey_call_no_orig) = @_;
+    my $error_message = "Unparsable call number:";
+    my ($dewey_number,
+        $everything_else,
+        $dewey_call_no,
+        $normalized);
+
+    # Remove any initial whitespace
+    $dewey_call_no = $dewey_call_no_orig;
+    $dewey_call_no =~ s/^\s+//g;
+    # Convert all alpha to uppercase
+    $dewey_call_no = uc($dewey_call_no);
+    if ($dewey_call_no =~ /^\D*([0-9]{3}\.*[0-9]*)\s*(.*)$/) {
+        $dewey_number = $1;
+        $everything_else = $2;
+        # Put a space between any adjoining digit and non-digit
+        $everything_else =~ s/(\d)(\D)/$1 $2/g;
+        $everything_else =~ s/(\D)(\d)/$1 $2/g;
+        # Put a space between any adjoining punctuation and alphanumeric character
+        $everything_else =~ s/(\p{P})(\w)/$1 $2/g;
+        $everything_else =~ s/(\w)(\p{P})/$1 $2/g;
+        # Exception is apparently periods in front of digits
+        $everything_else =~ s/(\.) (\d)/$1$2/g;
+        # Remove periods not preceding a digit
+        $everything_else =~ s/ \. //g;
+        # Allow no more than one space in row
+        $everything_else =~ s/\s{2,}/ /g;
+        # Remove any initial whitespace
+        $everything_else =~ s/^\s+//g;
+        # Remove any trailing whitespace and periods
+        $everything_else =~ s/[\s\.]+$//;
+        $normalized = "$dewey_number"
+                    . " $everything_else";
+        return "$normalized";
+    } else {
+	ErrorPage("<p>$Lang::string_cn_error</p><p>$dewey_call_no_orig</p>");
+    }
+}
+
+
+##########################################################
 #  DoPrelimWork1
 ##########################################################
 
@@ -951,8 +875,15 @@ sub DoPrelimWork2 {
     ConnectVygrDB();
     
     # Normalize the call numbers
-    $call_num_start = NormalizeLC($call_num_start);
-    $call_num_end   = NormalizeLC($call_num_end);
+    if ($classification eq 'LC') {
+        $call_num_start = NormalizeLC($call_num_start);
+        $call_num_end   = NormalizeLC($call_num_end);
+    } elsif ($classification eq 'DD') {
+        $call_num_start = NormalizeDewey($call_num_start);
+        $call_num_end   = NormalizeDewey($call_num_end);
+    } else {
+        ErrorPage("$Lang::string_callno_class");
+    }
 
     if ($call_num_start gt $call_num_end) {
         my $temp_call_num = $call_num_end;
@@ -1000,32 +931,32 @@ sub GetShelfList {
     $location_display_name =~ s/\&/&amp;/g;
 
     my $table_heading = qq(
-    <tr id="shelfList">
-        <th scope="col"><abbr title="$Lang::string_number_full">$Lang::string_number_abbrev</abbr></th>
+        <tr id="shelfList">
     );
 
     if ($show_charge_stats eq "Y") {
         $table_heading .= qq(
-        <th scope="col"><abbr title="$Lang::string_ch_full">$Lang::string_ch_abbrev</abbr></th>
+          <th scope="col" class="rightbottom"><abbr title="$Lang::string_ch_full">$Lang::string_ch_abbrev</abbr></th>
         );
     }
     if ($show_browse_stats eq "Y") {
         $table_heading .= qq(
-        <th scope="col"><abbr title="$Lang::string_br_full">$Lang::string_br_abbrev</abbr></th>
+          <th scope="col" class="rightbottom"><abbr title="$Lang::string_br_full">$Lang::string_br_abbrev</abbr></th>
         );
     }
 
     if ($show_item_status eq "Y") {
         $table_heading .= qq(
-        <th><abbr title="$Lang::string_st_full">$Lang::string_st_abbrev</abbr></th>
+          <th scope="col" class="centerbottom"><abbr title="$Lang::string_st_full">$Lang::string_st_abbrev</abbr></th>
         );
     }
 #    if ($show_boxes eq "Y") {
 #	$table_heading .= qq(
-#        <th scope="col"></th>
+#        <th scope="col">&nbsp;</th>
 #        );
 #    }
-	$table_heading .= qq(\t<th scope="col"></th>\n);
+    # check mark &#x2713; checked box &#x22A0;
+    $table_heading .= qq(\n          <th scope="col" class="centerbottom">&#x2713;&nbsp;</th>\n);
 
     my $toggle_purposes_url     = "$this_script?$ENV{'QUERY_STRING'}";
 
@@ -1051,18 +982,16 @@ sub GetShelfList {
     }
 
     if ($show_callno_plus eq "Y") {
-        $callno_plus_toggle_url =~ s/cnplus=Y/cnplus=N/;
+        $callno_plus_toggle_url =~ s/\&cnplus=Y//;
+        $callno_plus_toggle_url .= '&cnplus=N';
         $callno_plus_toggle_url =~ s/\&/&amp;/g;
-        $call_number_plus_toggle = qq(<a href="$callno_plus_toggle_url" title="$Lang::string_callno_plus_tog">&minus;</a>);
-    } else {
-        if ($callno_plus_toggle_url =~ /cnplus=N/) {
-            $callno_plus_toggle_url =~ s/cnplus=N/cnplus=Y/;
-        } else {
-            $callno_plus_toggle_url .= '&cnplus=Y';
-        }
+        $call_number_plus_toggle = qq(<span data-role="button"><a href="$callno_plus_toggle_url" class="cnplusToggle" title="$Lang::string_callno_plus_tog">&#x2212; $Lang::string_item_data</a></span>);
+    } elsif ($show_callno_plus eq "N") {
+        $callno_plus_toggle_url =~ s/\&cnplus=N//;
+        $callno_plus_toggle_url .= '&cnplus=Y';
         $callno_plus_toggle_url      =~ s/&omoo=[YN]//;;
         $callno_plus_toggle_url =~ s/\&/&amp;/g;
-        $call_number_plus_toggle = qq(<a href="$callno_plus_toggle_url" title="$Lang::string_callno_plus_tog">+</a>);
+        $call_number_plus_toggle = qq(<span data-role="button"><a href="$callno_plus_toggle_url" title="$Lang::string_callno_plus_tog">&#x2B; $Lang::string_item_data</a></span>);
     }
 
     my $switch_mode_link = "$toggle_purposes_url";
@@ -1074,9 +1003,10 @@ sub GetShelfList {
         }
         $switch_mode_link =~ s/\&/&amp;/g;;
         $table_heading .= qq(
-        <th scope="col" id="listHeader">$Lang::string_titles</th>
-      </tr>
+          <th scope="col" id="listHeader"><span data-role="controlgroup" data-type="horizontal"><span data-role="button"><a class="" href="$switch_mode_link" title="$Lang::string_call_no_blurb">$Lang::string_call_no</a></span><span data-role="button" class="ui-btn-active">$Lang::string_titles</span></span</th>
+        </tr>
         );
+        # mdd toggle
         $title_callno_toggle_btn = qq(<a href="$switch_mode_link" title="$Lang::string_call_no_blurb">$Lang::string_call_no</a>);
     } else {
         if ($switch_mode_link =~ /mode=1/) {
@@ -1085,9 +1015,10 @@ sub GetShelfList {
             $switch_mode_link .= '&mode=2';
         }
         $switch_mode_link =~ s/\&/&amp;/g;;
+
         $table_heading .= qq(
-        <th scope="col" id="listHeader">$Lang::string_call_no <span class="cnplusToggle">$call_number_plus_toggle</span></th>
-      </tr>
+          <th scope="col" id="listHeader"><span data-role="controlgroup" data-type="horizontal"><span data-role="button" class="ui-btn-active">$Lang::string_call_no</span>$call_number_plus_toggle<span data-role="button"><a href="$switch_mode_link" title="$Lang::string_titles_blurb">$Lang::string_titles</a></span></span></th>
+         </tr>
         );
         $title_callno_toggle_btn = qq(<a href="$switch_mode_link" title="$Lang::string_titles_blurb">$Lang::string_titles</a>);
     } 
@@ -1099,17 +1030,21 @@ sub GetShelfList {
         }
     }
 
+    if ($ShelfListerIni::location_name_option eq 'F') {
+        $location_display = $location_display_name;
+    }
+
     print encode_utf8(qq(
-    <h1>$Lang::string_shelf_list</h1>
-    <div id="titleCallNoToggle">$title_callno_toggle_btn</div>
-    $Lang::string_location <abbr title="$location_display_name">$location_display</abbr>
-    <form action="$this_script" method="get" accept-charset="UTF-8">
-      <input type="hidden" name="show" value="mail">
-    <table summary="$Lang::string_shelf_list_table">
-    <thead>
+    <h2>$Lang::string_shelf_list</h2>
+    <div id="shelvingLocation">
+    $Lang::string_location <span class="bold">$location_display</span>
+    </div>
+    <form>
+    <table>
+      <thead>
     $table_heading
-    </thead>
-    <tbody>
+      </thead>
+      <tbody>
     ));
 
     my (@stash_of_rows, $array_ref);
@@ -1242,13 +1177,14 @@ sub GetShelfList {
     }
 
     print qq(
-    </tbody>
-  </table>
-  </form>
+      </tbody>
+    </table>
+    </form>
     );
 
 #    //mdd Previous button... more testing?
     my $prev_next = '';
+    $prev_next = qq(<fieldset class="ui-grid-a">\n);
     if ($ending_pnt > $recs_per_page) {
         my $prev_starting_pnt = $starting_pnt - $recs_per_page;
 	my $prev_number = $recs_per_page;
@@ -1259,8 +1195,7 @@ sub GetShelfList {
         my $query_string = $ENV{'QUERY_STRING'};
         $query_string =~ s/&stpt=[\d]*/&stpt=$prev_starting_pnt/;  
         $query_string =~ s/\&/&amp;/g;  
-        #$prev_next = qq(<a class="prevBtn" href="$this_script?$query_string"><span class="fauxButton">&lt; $Lang::string_prev $prev_number</span></a>);
-        $prev_next = qq(<a class="prevBtn" href="$this_script?$query_string"><span class="fauxButton">&lt; $Lang::string_prev</span></a>);
+        $prev_next .= qq(<div class="ui-block-a"><a data-role="button" data-icon="arrow-l" data-iconpos="left" href="$this_script?$query_string">$Lang::string_prev</a></div>);
     }
 
     if ($true_count > $ending_pnt) {
@@ -1272,24 +1207,25 @@ sub GetShelfList {
         my $query_string = $ENV{'QUERY_STRING'};
 	$query_string =~ s/&stpt=[\d]*/&stpt=$new_starting_pnt/;
         $query_string =~ s/\&/&amp;/g;  
-	#$prev_next .= qq(<a class="nextBtn" href="$this_script?$query_string"><span class="fauxButton">$Lang::string_next $next_number &gt;</span></a>);
-	$prev_next .= qq(<a class="nextBtn" href="$this_script?$query_string"><span class="fauxButton">$Lang::string_next &gt;</span></a>);
+	$prev_next .= qq(<div class="ui-block-b"><a data-role="button" data-icon="arrow-r" data-iconpos="right" href="$this_script?$query_string">$Lang::string_next</a></div>);
     }
+    $prev_next .= qq(\n  </fieldset>);
 
     if ($prev_next) {
-        print qq(<div class="prevNext">$prev_next</div>);
+        print qq($prev_next);
     }
     if ($true_count < 1 ) {
         my $message .= qq(
-         <div class="margin">
-           <h1 class="error">$Lang::string_no_results</h1>
+         <div>
+           <h2 class="error">$Lang::string_no_results</h2>
             <p>$Lang::string_no_results_desc</p>
          );
 	if ($search_type eq 's2') {
 	    $message .= qq(<p>$Lang::string_no_results_loc</p>);
         }
         $message .= qq(
-           <div><input type="button" value="$Lang::string_back" class="button" onClick="history.go\(-1\);"></div>
+           <div>
+             <input type="button" data-icon="arrow-l" data-inline="true" value="$Lang::string_back" class="button" onClick="history.go\(-1\);"></div>
            </div>
         );
         print $message;
@@ -1319,10 +1255,18 @@ sub ShowRecordMFHD {
 
     PrintHead("$Lang::string_item_view");
     print qq(
-      <h1>$Lang::string_item_view</h1>
       $back_button
+      <h2>$Lang::string_item_view</h2>
     );
-    my ($call_number, $title, $author, $edition, $bib_id, $mfhd_id, $isbn);
+    my ($call_number, 
+        $title, 
+        $author, 
+        $edition, 
+        $bib_id, 
+        $mfhd_id, 
+        $isbn, 
+        $network_no, 
+        $oclc_no);
     while( my (@entry) = $sth->fetchrow_array() ) {
 	$call_number    = decode_utf8($entry[0]);
 	$title 	        = decode_utf8($entry[1]);
@@ -1331,11 +1275,8 @@ sub ShowRecordMFHD {
 	$bib_id         = decode_utf8($entry[4]);
 	$mfhd_id        = decode_utf8($entry[5]);
 	$isbn           = decode_utf8($entry[6]);
+	$network_no     = decode_utf8($entry[7]);
     }
-
-    # Note: should really use "pass by reference" to pass the %barcode
-    # array to subroutine, but this syntax seems to work in this case.
-    PrintSaveForm($bib_id, $mfhd_id, "", $call_number, "");
 
     # This adds Unicode LRM (LEFT-TO-RIGHT MARK) after ASCII only text
     if ($Lang::text_direction =~ /RTL/i) {
@@ -1349,32 +1290,52 @@ sub ShowRecordMFHD {
 
     print encode_utf8(qq(
          <div class="itemNum">$call_number</div>
-         <div class="itemTitle>$title &nbsp; $edition</div>
+         <div class="itemTitle">$title &nbsp; $edition</div>
          <div class="message">$Lang::string_no_item_record</div>
-         <div id="lookUp" class="topBorder">
-           $Lang::string_look_up_in
-           <ul>
+    ));
+
+    # Note: should really use "pass by reference" to pass the %barcode
+    # array to subroutine, but this syntax seems to work in this case.
+    PrintSaveForm($bib_id, $mfhd_id, "", $call_number, "");
+
+    print encode_utf8(qq(
+         <div>
+           <ul data-role="listview" data-inset="true">
+             <li data-role="list-divider">
+                $Lang::string_look_up_in
+             </li>
              <li>
                <a href="$ShelfListerIni::webvoyage_server_link$bib_id" target="catalog">$Lang::voyager_record_link_text</a>
              </li>
     ));
 
-    $isbn = MungeISBN($isbn);
+    $isbn    = MungeISBN($isbn);
+    $oclc_no = MungeNetworkNumber($network_no);
 
-    if ($isbn) {
-        my $worldcat_link_url = $ShelfListerIni::worldcat_link . $isbn;
+    my $worldcat_link_url = '';
+    if ($isbn && $ShelfListerIni::worldcat_link) {
+        $worldcat_link_url = $ShelfListerIni::worldcat_link . "/isbn/$isbn";
+    } elsif ($oclc_no && $ShelfListerIni::worldcat_link) {
+        $worldcat_link_url = $ShelfListerIni::worldcat_link . "/oclc/$oclc_no";
+    }
+    if ($isbn || $oclc_no) {
         if ($ShelfListerIni::worldcat_link_location) {
             $worldcat_link_url .= "&amp;loc=" . $ShelfListerIni::worldcat_link_location;
-        }
-        print qq(
+            print qq(
              <li>
                <a href="$worldcat_link_url" target="worldcat">$Lang::worldcat_record_link_text</a>
              </li>
-        );
+            );
+        }
     }
 
+    my $google_link_url = '';
     if ($isbn && $ShelfListerIni::google_link) {
-        my $google_link_url = $ShelfListerIni::google_link . $isbn;
+        $google_link_url = $ShelfListerIni::google_link . "ISBN$isbn";
+    } elsif ($oclc_no && $ShelfListerIni::google_link) {
+        $google_link_url = $ShelfListerIni::google_link . "OCLC:$oclc_no";
+    }
+    if ($isbn || $oclc_no) {
         print qq(
              <li>
                <a href="$google_link_url" target="google">$Lang::google_record_link_text</a>
@@ -1384,6 +1345,23 @@ sub ShowRecordMFHD {
     print qq(
            </ul>
     );
+
+    if ($call_number && $ShelfListerIni::webvoyage_callno_browse) {
+        $call_number =~ tr/ /+/;
+        $call_number =~ s/([^A-Za-z0-9+])/sprintf("%%%02X", ord($1))/seg;
+        print qq(
+         <div>
+           <ul data-role="listview" data-inset="true">
+             <li data-role="list-divider">
+                $Lang::string_callno_label
+             </li>
+             <li>
+               <a href="$ShelfListerIni::webvoyage_callno_browse$call_number" target="catalog">$Lang::string_callno_browse</a>
+             </li>
+           </ul>
+         </div>
+        );
+    }
 
     PrintTail();
 
@@ -1410,6 +1388,25 @@ sub MungeISBN {
 
 
 ##########################################################
+#  MungeNetworkNumber
+##########################################################
+
+sub MungeNetworkNumber {
+    my ($network_no) = @_;
+    if ($network_no =~ /OCoLC/) {
+        $network_no =~ s/\s//;
+        $network_no =~ s/^[\D]*([\d]*)$/$1/;
+        if ($network_no =~ /^[\d]*$/){
+            if (length($network_no) > 3 && length($network_no) < 14) {
+                return($network_no);
+            }
+        }
+    }
+    return('');
+}
+
+
+##########################################################
 #  ShowRecordItem
 ##########################################################
 
@@ -1427,10 +1424,31 @@ sub ShowRecordItem {
 
     PrintHead("$Lang::string_item_view");
     print qq(
-      <h1>$Lang::string_item_view</h1>
       $back_button
+      <h2>$Lang::string_item_view</h2>
     );
-    my ($call_number, $enum, $chron, $year, $copy_number, $title, $author, $edition, %status, %barcode, $bib_id, $mfhd_id, $item_id, $item_type_name, $isbn, $hist_charges, $hist_browses, $item_note);
+    my ($call_number,
+	$call_number_base,
+	$enum,
+	$chron,
+	$year,
+	$copy_number,
+	$title,
+	$author,
+	$edition,
+	%status,
+	%barcode,
+	$bib_id,
+	$mfhd_id,
+	$item_id,
+	$item_type_name,
+	$isbn,
+	$network_no,
+	$hist_charges,
+	$hist_browses,
+	$item_note,
+	$oclc_no);
+
     while( my (@entry) = $sth->fetchrow_array() ) {
 	$call_number 	= decode_utf8($entry[0]);
 	$enum	 	= decode_utf8($entry[1]);
@@ -1438,7 +1456,6 @@ sub ShowRecordItem {
 	$year	 	= decode_utf8($entry[3]);
 	$copy_number 	= decode_utf8($entry[4]);
 	$title 		= decode_utf8($entry[5]);
-	#$title 		= $entry[5];
 	$author 	= decode_utf8($entry[6]);
 	$edition 	= decode_utf8($entry[7]);
 	%status  = (%status,  (decode_utf8($entry[8])  => decode_utf8($entry[9])));
@@ -1451,7 +1468,9 @@ sub ShowRecordItem {
 	$hist_charges   = decode_utf8($entry[17]);
 	$hist_browses   = decode_utf8($entry[18]);
         $item_note      = decode_utf8($entry[19]);
+        $network_no     = decode_utf8($entry[20]);
     }
+    $call_number_base = $call_number;
     if ($enum) {
 	$call_number .= " $enum";
     }
@@ -1465,14 +1484,15 @@ sub ShowRecordItem {
 	$call_number .= " c.$copy_number";
     }
 
-    # Note: Should really use "pass by reference" to pass the %barcode
-    # array to subroutine, but this syntax seems to work in this case.
-    PrintSaveForm($bib_id, $mfhd_id, $item_id, $call_number, %barcode);
-
     # This adds Unicode LRM (LEFT-TO-RIGHT MARK) after ASCII only text
     if ($Lang::text_direction =~ /RTL/i) {
         unless ($title !~ /[\x20-\x7E]/) {
             $title .= "&#x200E;";
+            if ($edition) {
+                unless ($edition !~ /[\x20-\x7E]/) {
+                    $edition .= "&#x200E;";
+                }
+            }
         }
         unless ($call_number !~ /[\x20-\x7E]/) {
             $call_number .= "&#x200E;";
@@ -1525,31 +1545,48 @@ sub ShowRecordItem {
         );
     }
 
+    # Note: Should really use "pass by reference" to pass the %barcode
+    # array to subroutine, but this syntax seems to work in this case.
+    PrintSaveForm($bib_id, $mfhd_id, $item_id, $call_number, %barcode);
+
     print qq(
-         <div id="lookUp" class="topBorder">
-           $Lang::string_look_up_in
-           <ul>
+         <div>
+           <ul data-role="listview" data-inset="true">
+             <li data-role="list-divider">
+                $Lang::string_look_up_in
+             </li>
              <li>
                <a href="$ShelfListerIni::webvoyage_server_link$bib_id" target="catalog">$Lang::voyager_record_link_text</a>
              </li>
     );
 
-    $isbn = MungeISBN($isbn);
+    $isbn    = MungeISBN($isbn);
+    $oclc_no = MungeNetworkNumber($network_no);
 
+    my $worldcat_link_url = '';
     if ($isbn && $ShelfListerIni::worldcat_link) {
-        my $worldcat_link_url = $ShelfListerIni::worldcat_link . $isbn;
+        $worldcat_link_url = $ShelfListerIni::worldcat_link . "/isbn/$isbn";
+    } elsif ($oclc_no && $ShelfListerIni::worldcat_link) {
+        $worldcat_link_url = $ShelfListerIni::worldcat_link . "/oclc/$oclc_no";
+    }
+    if ($isbn || $oclc_no) {
         if ($ShelfListerIni::worldcat_link_location) {
             $worldcat_link_url .= "&amp;loc=" . $ShelfListerIni::worldcat_link_location;
-        }
-        print qq(
+            print qq(
              <li>
                <a href="$worldcat_link_url" target="worldcat">$Lang::worldcat_record_link_text</a>
              </li>
-        );
+            );
+        }
     }
 
+    my $google_link_url = '';
     if ($isbn && $ShelfListerIni::google_link) {
-        my $google_link_url = $ShelfListerIni::google_link . $isbn;
+        $google_link_url = $ShelfListerIni::google_link . "ISBN$isbn";
+    } elsif ($oclc_no && $ShelfListerIni::google_link) {
+        $google_link_url = $ShelfListerIni::google_link . "OCLC:$oclc_no";
+    }
+    if ($isbn || $oclc_no) {
         print qq(
              <li>
                <a href="$google_link_url" target="google">$Lang::google_record_link_text</a>
@@ -1560,6 +1597,23 @@ sub ShowRecordItem {
            </ul>
          </div>
     );
+
+    if ($call_number_base && $ShelfListerIni::webvoyage_callno_browse) {
+        $call_number_base =~ tr/ /+/;
+        $call_number_base =~ s/([^A-Za-z0-9+])/sprintf("%%%02X", ord($1))/seg;
+        print qq(
+         <div>
+           <ul data-role="listview" data-inset="true">
+             <li data-role="list-divider">
+                $Lang::string_callno_label
+             </li>
+             <li>
+               <a href="$ShelfListerIni::webvoyage_callno_browse$call_number_base" target="catalog">$Lang::string_callno_browse</a>
+             </li>
+           </ul>
+         </div>
+        );
+    }
 
     PrintTail();
 
@@ -1590,7 +1644,8 @@ sub PrintSaveForm {
         }
     }
     print qq(
-	<form action="$this_script" method="get" accept-charset="UTF-8">
+        <div data-role="fieldcontain">
+        <form action="$this_script" method="get" accept-charset="UTF-8">
           <label for="save_status">$Lang::string_mark_status_label</label>
 	  <select name="save_status" size="1" id="save_status">
     );
@@ -1599,7 +1654,7 @@ sub PrintSaveForm {
     }
     print qq(
 	  </select>
-	  <input type="submit" name="submit" class="button" value="&gt;">
+	  <input type="submit" name="submit" data-inline="true" value="$Lang::string_mark_submit">
           <br>
     );
     if ($update_ok eq "yes") {
@@ -1614,8 +1669,8 @@ sub PrintSaveForm {
 	  <input type="hidden" name="save_item_id" value="$item_id">
 	  <input type="hidden" name="save_call_no" value="$call_number">
 	  <input type="hidden" name="save_barcode" value="$save_to_file_barcode">
-	</form>\n\n);
-
+	</form>
+        </div>\n);
 }
 
 
@@ -1653,7 +1708,8 @@ sub SaveToFile {
     print qq(
     Item marked as <b>$save_status</b>
     );
-    print qq(<br><br>Marking an item does not update the Voyager database.  It adds an entry to the <a href="$this_script?show=mif">Marked Items File</a>.);
+    print qq(<p>Marking an item does not update the Voyager database.  It adds an entry to the <a href="$this_script?show=mif">Marked Items File</a>.</p>
+    $back_button);
     PrintTail();
 }
 
@@ -1736,36 +1792,25 @@ sub PrintRow {
 	$copy_number,
 	$line_number,
         $title_brief) = @_;
-        if ($line_number < 10) {
-            $line_number = "&nbsp;&nbsp;$line_number";
-        }
-    my $checkbox_value = '';
+
     # Ugly hack for getting a proper border using RTL on IE
     if ($Lang::text_direction =~ /RTL/i) {
         $line_number = "&#x200B;" . $line_number . "&#x200B;";
     }
-    print qq(\n    <tr class="recordRow">
-         <td align="right" valign="top">);
-    if ($item_id) {
-	print qq(<a class="numLink" href="$this_script?record_type=item&amp;record_no=$item_id">$line_number</a>);
-        $checkbox_value = "item$item_id";
-    } else {
-	print qq(<a class="numLink" href="$this_script?record_type=mfhd&amp;record_no=$mfhd_id">$line_number</a>);
-        $checkbox_value = "mfhd$mfhd_id";
-    }
-    print "</td>";
+    print qq(\n\t    <tr class="recordRow">);
+#    print qq(\n\t<td class="righttop">$line_number</td>);
     if ($show_charge_stats eq "Y") {
-        print qq(\n\t<td align="right" valign="top">);
+        print qq(\n\t      <td class="righttop">);
         print "$hist_charges";
         print "</td>";
     }
     if ($show_browse_stats eq "Y") {
-        print qq(\n\t<td align="right" valign="top">);
+        print qq(\n\t      <td class="righttop">);
         print "$hist_browses";
         print "</td>";
     }
     if ($show_item_status eq "Y") {
-        print qq(\n\t<td align="center" valign="top">);
+        print qq(\n\t      <td class="centertop">);
         print "<strong>$status_abbrev</strong>";
         print "</td>";
     }
@@ -1804,39 +1849,30 @@ sub PrintRow {
         }
     }
 
-    if ($show_boxes eq "Y") {
-	#print qq(
-        #    <td valign="top"><input type="checkbox"></td>
-        #);
+    print qq(\n\t      <td><div class="checkbox"><input type="checkbox" title="Check box" name="check" value="null"></div></td>
+    );
+
+    if ($item_id) {
+	print encode_utf8(qq(      <td data-role="button" data-corners="false" data-icon="arrow-r" data-iconpos="right" data-mini="true"><a class="listLineLink" href="$this_script?record_type=item&amp;record_no=$item_id">));
+    } else {
+	print encode_utf8(qq(      <td data-role="button" data-corners="false" data-icon="arrow-r" data-iconpos="right" data-mini="true"><a class="listLineLink" href="$this_script?record_type=mfhd&amp;record_no=$mfhd_id">));
     }
-	print qq(
-            <td valign="top"><input title="$Lang::string_checkbox" type="checkbox" name="check" value="$checkbox_value"></td>
-        );
 
     if ($list_display eq '2') {
         if ($mouse_over eq "Y") {
-            print encode_utf8(qq(
-                <td valign="top"><span class="listLine" onMouseOver="this.firstChild.nodeValue='$display_call_no';" onMouseOut="this.firstChild.nodeValue='$title_brief';">$title_brief</span>
-            ));
+            print encode_utf8(qq(<span class="listLine" onMouseOver="this.firstChild.nodeValue='$display_call_no';" onMouseOut="this.firstChild.nodeValue='$title_brief';">$title_brief</span>));
         } else {
-            print encode_utf8(qq(
-                <td valign="top"><span class="listLine">$title_brief</span>
-            ));
+            print encode_utf8(qq(<span class="listLine">$title_brief</span>));
         }
     } else {
         if ($mouse_over eq "Y") {
-            print encode_utf8(qq(
-                <td valign="top"><span class="listLine" onMouseOver="this.firstChild.nodeValue='$title_brief';" onMouseOut="this.firstChild.nodeValue='$display_call_no';">$display_call_no</span> $extra_item_info
-            ));
+            print encode_utf8(qq(<span class="listLine" onMouseOver="this.firstChild.nodeValue='$title_brief';" onMouseOut="this.firstChild.nodeValue='$display_call_no';">$display_call_no</span> $extra_item_info));
         } else {
-            print encode_utf8(qq(
-                <td valign="top"><span class="listLine">$display_call_no</span> $extra_item_info
-            ));
+            print encode_utf8(qq(<span class="listLine">$display_call_no</span> $extra_item_info ));
         }
     }
-    print qq(</td>\n    </tr>);
+    print qq(</a></td>\n\t    </tr>);
 }
-
 
 ############################################################
 #  StatusAbbrev
@@ -1935,7 +1971,8 @@ sub ConstructSQLitem{
 	bib_text.isbn,
 	item.historical_charges,
 	item.historical_browses,
-        item_note.item_note
+        item_note.item_note,
+	bib_text.network_number
     from
 	$db_name.bib_text,
 	$db_name.bib_master,
@@ -1979,7 +2016,8 @@ sub ConstructSQLmfhd{
 	bib_text.edition,
 	bib_mfhd.bib_id,
 	bib_mfhd.mfhd_id,
-	bib_text.isbn
+	bib_text.isbn,
+	bib_text.network_number
     from
 	$db_name.bib_text,
 	$db_name.bib_master,
@@ -2074,7 +2112,6 @@ sub ConstructSQLlist {
 }
 
 
-
 ##########################################################
 #  PrintHead
 ##########################################################
@@ -2098,429 +2135,220 @@ sub PrintHead {
     } else { 
         $search_link = "?show=s1";
     }
+
+    my $jqm_overrides = q|
+      <script>
+        $(document).bind("mobileinit", function(){
+          //apply jQuery Mobile overrides here
+          //e.g. change this for multilingual -mdd
+          $.mobile.loadingMessage = "Loading";
+        });
+      </script>
+    |;
+
+    # my $css_main = qq(<link rel="stylesheet" href="$ShelfListerIni::css_directory/$css_file" />);
     my $css_main = InternalCSS();
+    if ($Lang::text_direction =~ /RTL/i) {
+        $css_main .= qq(<link rel="stylesheet" href="$ShelfListerIni::css_directory/$css_file_rtl" />);
+    }
     print "Content-type: text/html; charset=utf-8\n\n";
     print qq( 
 $doc_type_def
 <html lang="$Lang::language_code">
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-  <meta http-equiv="Content-Script-Type" content="text/javascript">
-  <meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="format-detection"   content="telephone=no">
+  <link rel="apple-touch-icon" sizes="72x72" href="./touch-icon-ipad-72.png" />
   <title>$this_app : $sub_title</title>
-  <meta name="DC.Title"       content="$this_app $version">
-  <meta name="DC.Creator"     content="Michael Doran">
-  <meta name="DC.Type"        content="Software">
-  <meta name="DC.Source"      content="http://rocky.uta.edu/doran/shelflister/">
-  <meta name="DC.Publisher"   content="University of Texas at Arlington Library"> 
-  <meta name="DC.Rights"      content="Copyright 2003-2009 University of Texas at Arlington">
+  <meta name="dcterms.title"      content="$this_app $version" />
+  <meta name="dcterms.creator"    content="Michael Doran" />
+  <meta name="dcterms.type"       content="Software" />
+  <meta name="dcterms.source"     content="http://rocky.uta.edu/doran/shelflister/" />
+  <meta name="dcterms.publisher"  content="University of Texas at Arlington Library" /> 
+  <meta name="dcterms.rights"     content="Copyright 2003-2012 University of Texas at Arlington" />
+  <link rel="stylesheet" href="http://code.jquery.com/mobile/1.0/jquery.mobile-1.0.min.css" />
+  <script src="http://code.jquery.com/jquery-1.6.4.min.js"></script>
+  $jqm_overrides
+  <script src="http://code.jquery.com/mobile/1.0.1/jquery.mobile-1.0.1.min.js"></script>
   $css_main
 </head>
 );
     if ($show_page eq 's1') {
-	print qq(<body onload="document.forms['barcode'].elements['bcs'].focus()">\n);
+	print qq(<body>\n);
     } elsif ($show_page eq 's2') {
-	print qq(<body onload="document.forms['callNumber'].elements['cns'].focus()">\n);
+	print qq(<body>\n);
     } else {
 	print qq(<body>\n);
     }
     print qq(
-    <div id="topBar">
-       <span id="logo">ShelfLister</span>
-       <span id="topNav">
-         <a $active_search href="$this_script$search_link">$Lang::string_search</a>
-         <a $active_help href="$this_script?show=help">$Lang::string_help</a>
-       </span>
+  <div data-role="page">
+    <div data-role="header" data-theme="b">
+      <a $active_search data-icon="home" href="$this_script$search_link">$Lang::string_search</a>
+      <h1>ShelfLister</h1>
+      <a $active_help data-icon="info" href="$this_script?show=help">$Lang::string_help</a>
     </div>
-    <div id="mainContent">
+    <div data-role="content">
     );
 }
 
-
 ##########################################################
-#  CSS Style Sheets 
+#  CSS Style Sheets
 ##########################################################
 
 sub InternalCSS {
   my $css = qq(
-    <style type="text/css">
-    <!--
-    body {
-      margin: 0;
-      font-family: sans-serif; 
-      max-width: 320px;
-    }
-    h1 {
-      font-size: 1.1em;
-      font-weight: bold;
-      margin: 4px 5px 9px 10px;
-    }
-    h1.error {
-      color: red;
-    }
-    p {
-      margin-top: 3px; 
-    }
-    legend {
-      border: 2px solid #D8DFEA;
-      padding: 0 1em 0 1em;
-    }
-    fieldset {
-      border: 2px solid #D8DFEA;
-    }
-    #topBar {
-      background-color: #3B5998;
-      font-weight: bold;
-      border-bottom: 2px solid #6D84B4;
-      padding: 4px 0px 4px 0px; 
-      min-height: 1.2em;
-    }
-    #logo {
-      float: left;
-      color: #ffffff;
-      font-size: 1.2em;
-      margin: 0 15px 0 15px;
-      letter-spacing: 1px;
-      text-shadow: #222222 0.1em 0.1em 0.2em;
-    }
-    #topNav {
-      margin: 0 7px 0 7px;
-      float: right;
-    }
-    #topNav a, #titleCallNoToggle a {
-      background-color: #D8DFEA;
-      text-decoration: none;
-      color: #000000;
-      color: #3B5998;
-      border: 2px solid #6D84B4;
-      padding: 0 5px 0 5px;
-    }
-    #titleCallNoToggle a {
-      display: block;
-    }
-    #topNav a.activeMenu {
-      background-color: #FFFFFF;
-    }
-    #titleCallNoToggle {
-      font-weight: bold;
-      float: right;
-    }
-    #mainContent {
-      margin: 10px 5px 5px 5px; 
-      clear: both;
-    }
-    .margin {
-      margin-left: 15px;
-    }
-    .tabsContainer {
-      float: left;
-      /*
-      */
-      margin: 0;
-      padding: 0;
-    }
-    .tabs {
-      white-space: nowrap;
-      margin-left: 10px;
-    }
-    ul.tabs {
-      list-style-type: none;
-      list-style-position: outside;
-      margin: 0;
-      padding: 0;
-    }
-    .tabs li {
-      display: inline;
-      float: left;
-      border: 2px solid #D8DFEA;
-      padding: 2px 6px 2px 6px;
-      margin: 0 4px -2px 6px;
-    }
-    .tabs a {
-      text-decoration: none;
-    }
-    .tabs a:hover {
-      text-decoration: underline;
-    }
-    .tabs li.on {
-      border-bottom: 2px solid #FFFFFF;
-    }
-    .tabs li.off {
-      background-color: #D8DFEA;
-    }
-    .selected li {
-      background-color: #ECEFF5;
-    }
-    .formOn {
-      clear: both;
-      border: 2px solid #D8DFEA;
-      padding: 7px 7px 7px 7px;
-      max-width: 310px;
-    }
-    input, select {
-      font-size: 1em;
-      margin-bottom: 5px;
-    }
-    .formCheckBoxes {
-      float: left;
-    }
-    .formSubmit {
-      float: right;
-      vertical-align: bottom;
-      margin: 2em 15px 0 0;
-    }
-    .clear {
-      clear: both;
-    }
-    .prevNext {
-      text-align: center;
-      margin: 5px 20px 5px 20px;
-    }
-    .prevBtn {
-      float: left;
-    }
-    .nextBtn {
-      float: right;
-    }
-    .fauxButton {
-      text-decoration: none;
-      background-color:#3B5998;
-      color: #FFFFFF;
-      font-weight: bold;
-      border: 1px outset #000000;
-      padding: 2px 3px 2px 3px;
-    }
-    #shelfListTable {
-    }
-    table {
-      clear: both;
-      padding: 0;
-      border-collapse: collapse;
-      margin-top: 5px;
-    }
-    th {
-      white-space: nowrap;
-    }
-    tr#shelfList {
-      /*
-      border-bottom: 2px solid #ECEFF5;
-      */
-    }
-    th#listHeader {
-      text-align: left;
-      margin-left: 5px;
-    }
-    tr.recordRow {
-      /*
-      border-bottom: 1px solid #ECEFF5;
-      */
-    }
-    tr.recordRow a.numLink {
-      text-decoration: none;
-      border: 2px solid #6D84B4;
-      color: #3B5998;
-      padding: 0 3px 0 3px;
-      white-space: nowrap;
-      background-color: #D8DFEA;
-    }
-    td {
-      padding: 2px 2px 0 2px;
-    }
-    .cnplusToggle a {
-      font-weight: bold;
-      font-size: 1.1em;
-      text-decoration: none;
-      background-color: #FFF8C6;
-      border: 2px solid #6D84B4;
-      padding: 0 4px 0 4px;
-      margin-left: 2px;
-    }
-    .cnplusOn {
-      background-color: #FFF8C6;
-      padding: 0 3px 0 3px;
-      white-space: nowrap;
-    }
-    #copy {
-      clear: both;
-      margin-top: 5px;
-      margin-left: 20px;
-      font-size: 0.8em;
-    }
-    #copy a {
-      text-decoration: none;
-    }
-    #copy a:hover {
-      text-decoration: underline;
-    }
-    .author {
-      margin: 20px;
-    }
-    .center {
-      text-align: center;
-    }
-    .small {
-      font-size: small;
-    }
-    .itemNum {
-      margin: 5px;
-      font-weight: bold;
-    }
-    .itemTitle {
-      margin: 5px;
-      font-weight: bold;
-    }
-    .itemStats {
-      padding-top: 5px;
-      border-top: 1px solid #6D84B4;
-    }
-    .itemStatus {
-    }
-    .itemBarcode {
-    }
-    .data {
-      font-weight: bold;
-    }
-    .topBorder {
-      border-top: 1px solid #6D84B4;
-    }
-    #lookUp {
-      margin: 8px 0 0 0;
-      padding: 3px;
-    }
-    #lookUp ul {
-      margin: 5px;
-    }
-    #lookUp li {
-      list-style: none;
-    }
-    #lookUp li a {
-    }
+  <style type="text/css">
+  <!--
+    /*
+    #  This CSS supplements and/or customizes the CSS
+    #  provided by the JQuery Mobile framework
+    */
+h2.error {
+  color: red;
+}
+table {
+  font-size: 1.25em;
+  width: 100%;
+  clear: both;
+  padding: 0;
+  margin-top: 5px;
+  border-collapse: collapse;
+}
+tr.recordRow {
+  border-left: 1px solid #BBBBBB;
+}
+tr.recordRow:nth-child(2n) {
+  border-bottom: 1px solid #BBBBBB;
+}
+tr.recordRow:last-child {
+  border-bottom: 1px solid #BBBBBB;
+}
+.recordRow .ui-btn {
+  margin: 0;
+  text-align: left;
+}
+.recordRow .ui-shadow {
+  box-shadow: none;
+}
+.recordRow:nth-child(odd) .ui-btn {
+  border-top: 0;
+}
+.recordRow:nth-child(2n) .ui-btn {
+  border-top: 0;
+  border-bottom: 0;
+}
+.recordRow .ui-btn-inner {
+  padding: 0.2em 25px;
+  white-space: normal;
+}
+th {
+  white-space: nowrap;
+  padding: 3px 7px 3px 7px;
+  margin: 10px 20px 10px 20px;
+}
+th#listHeader {
+  text-align: left;
+  margin-left: 5px;
+}
+th.rightbottom {
+  text-align: right;
+  vertical-align: bottom;
+}
+th.centerbottom {
+  text-align: center;
+  vertical-align: bottom;
+}
+td {
+  padding: 6px 7px 0 7px;
+}
+td.right {
+  text-align: right;
+}
+td.righttop, th.righttop {
+  text-align: right;
+}
+td.centertop, th.centertop {
+  text-align: center;
+}
+td a {
+  display:block;
+  width:100%;
+  height:100%;
+  text-decoration:none;
+}
+.itemNum, .itemTitle {
+  font-size: 1.25em;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+.itemTitle {
+  font-size: 1.25em;
+  font-weight: bold;
+}
+.itemStats {
+  padding-top: 5px;
+  border-top: 1px solid #6D84B4;
+}
+.data {
+  font-weight: bold;
+}
+.recordRow .ui-checkbox {
+  margin-bottom: 0;
+}
+.checkbox {
+  text-align: center;
+}
+.checkbox input {
+  width: 2em;
+  height: 2em;
+  position: static;
+}
+.cnplusToggle {
+  border: 2px solid yellow;
+  padding: 2px 6px 2px 6px;
+}
+.cnplusOn {
+  border: 2px solid yellow;
+  padding: 0 3px 0 3px;
+  white-space: nowrap;
+}
+#listHeader div.ui-controlgroup {
+  margin: 0;
+}
+#listHeader span.ui-btn-inner {
+  padding: 5px 20px;
+}
+#listHeader a {
+  text-decoration: none;
+}
+#shelfList th {
+  border-bottom: 1px solid #BBBBBB;
+}
+#shelvingLocation {
+  margin-left: 0px;
+  margin-bottom: 10px;
+}
+.author {
+  margin: 20px;
+}
+.footertext {
+  font-size: 0.75em;
+  text-align: center;
+}
+.bold {
+  font-weight: bold;
+}
+.center {
+  text-align: center;
+}
+  -->
+  </style>
   );
-  if ($device eq 'iphone') {
-      $css .= qq(
-    body {
-      max-width: 100%;
-    }
-    #topNav {
-      margin-top: 5px;
-    }
-    #topNav a, #titleCallNoToggle a {
-      padding: 7px 7px 7px 7px;
-      -webkit-border-radius: 9px;
-    }
-    .tabs li {
-      padding: 4px 10px 4px 10px;
-      margin: 0 5px -2px 8px;
-      -webkit-border-top-right-radius: 9px;
-      -webkit-border-top-left-radius: 9px;
-    }
-    input, select {
-      font-size: 1em;
-      margin-bottom: 10px;
-    }
-    .checkbox {
-       width: 25px;
-       height: 25px;
-    }
-    .cnplusToggle a {
-      padding: 3px 8px 3px 8px;
-      -webkit-border-radius: 9px;
-    }
-    tr.recordRow a.numLink {
-      -webkit-border-radius: 5px;
-    }
-    .fauxButton {
-      padding: 5px 7px 5px 7px;
-      -webkit-border-radius: 6px;
-    }
-    #lookUp ul {
-      margin-left: 0;
-      margin-right: 0;
-      padding-left: 0;
-      padding-right: 0;
-    }
-    #lookUp li {
-      padding: 5px 10px 5px 10px;
-      margin-bottom: 4px;
-      border: 2px solid #6D84B4;
-      background-color: #D8DFEA;
-      -webkit-border-radius: 6px;
-    }
-    #lookUp li a {
-      display: block;
-      font-weight: bold;
-      text-decoration: none;
-    }
-      );
-  }
-  if ($browser eq 'chrome') {
-      $css .= qq(
-    #topNav a, #titleCallNoToggle a {
-      -webkit-border-radius: 7px;
-    }
-    .tabs li {
-      -webkit-border-top-right-radius: 7px;
-      -webkit-border-top-left-radius: 7px;
-    }
-    .cnplusToggle a {
-      -webkit-border-radius: 7px;
-    }
-    tr.recordRow a.numLink {
-      -webkit-border-radius: 7px;
-    }
-    .fauxButton {
-      -webkit-border-radius: 5px;
-    }
-      );
-  }
-  if ($Lang::text_direction =~ /RTL/i) {
-      $css .= qq(
-    html {
-      direction: rtl;
-    }
-    #logo {
-      float: right;
-    }
-    #topNav {
-      float: left;
-    }
-    .english {
-      direction: ltr;
-    }
-    .tabsContainer {
-      float: right;
-      /* width needed for IE, or tabs disappear to right */
-      width: 100%;
-    }
-    .tabs li {
-      float: right;
-    }
-    .formCheckBoxes {
-      float: right;
-    }
-    .formSubmit {
-      float: left;
-    }
-    #titleCallNoToggle {
-      float: left;
-    }
-    th#listHeader {
-      text-align: right;
-    }
-    .prevBtn {
-      float: right;
-    }
-    .nextBtn {
-      float: left;
-    }
-      );
-  }
-  $css .= qq(
-    -->
-    </style>
-  );
+
   return($css);
 }
+
 
 ##########################################################
 #  PrintTail
@@ -2538,6 +2366,10 @@ sub PrintTail {
     }
     print qq(
   </div>
+  <div data-role="footer" data-theme="b">
+    <div class="footertext">Copyright 2003-2012 University of Texas at Arlington</div>
+  </div>
+</div>
 </body>
 </html>);
 
@@ -2553,7 +2385,8 @@ sub PrintTail {
 sub ShowMIF {
     PrintHead();
     print qq(
-      <h1>$Lang::string_help : $Lang::string_mif_file</h1>
+      $back_button
+      <h2>$Lang::string_help : $Lang::string_mif_file</h2>
     );
     open (SAVEFILE, "<$report_dir/$out_file")
         || ($out_file = "no file yet");
@@ -2596,9 +2429,9 @@ sub ShowMIF {
         <div class="english">
 	Marked items are saved to a
 	file on the server.<br><br>
-	<table summary="Marked items file information">
+	<table>
 	  <tr>
-	    <td align="right">
+	    <td class="right">
 		Filename:&nbsp;
 	    </td>
 	    <td>
@@ -2606,7 +2439,7 @@ sub ShowMIF {
 	    </td>
 	  </tr>
 	  <tr>
-	    <td align="right">
+	    <td class="right">
 		Size:&nbsp;
 	    </td>
 	    <td>
@@ -2614,7 +2447,7 @@ sub ShowMIF {
 	    </td>
 	  </tr>
 	  <tr>
-	    <td align="right">
+	    <td class="right">
 		Directory:&nbsp;
 	    </td>
 	    <td>
@@ -2622,7 +2455,7 @@ sub ShowMIF {
 	    </td>
 	  </tr>
 	  <tr>
-	    <td align="right">
+	    <td class="right">
 		Entries:&nbsp;
 	    </td>
 	    <td>
@@ -2630,7 +2463,7 @@ sub ShowMIF {
 	    </td>
 	  </tr>
 	  <tr>
-	    <td align="right">
+	    <td class="right">
 		First:&nbsp;
 	    </td>
 	    <td>
@@ -2638,7 +2471,7 @@ sub ShowMIF {
 	    </td>
 	  </tr>
 	  <tr>
-	    <td align="right">
+	    <td class="right">
 		Last:&nbsp;
 	    </td>
 	    <td>
@@ -2676,9 +2509,10 @@ sub ShowHelp {
     if ($topic eq 'copyright') {
         PrintHead("$Lang::string_help : $Lang::string_copyright");
 	print qq{
-        <h1>$Lang::string_help : $Lang::string_copyright</h1>
-  <div class="small english">
-   Copyright 2003-2009, The University of Texas at Arlington ("UTA").
+        $back_button
+        <h2>$Lang::string_help : $Lang::string_copyright</h2>
+  <div class="english">
+   Copyright 2003-2012, The University of Texas at Arlington ("UTA").
    All rights reserved.
   <p>
   By using this software the USER indicates that he or she has read, understood and and will comply with the following:
@@ -2709,7 +2543,8 @@ sub ShowHelp {
     } elsif ($topic eq 'about') {
         PrintHead("$Lang::string_help : $Lang::string_about");
 	print qq(
-        <h1>$Lang::string_help : $Lang::string_about</h1>
+        $back_button
+        <h2>$Lang::string_help : $Lang::string_about</h2>
         );
         if ($Lang::blurb_about) {
             print qq($Lang::blurb_about);
@@ -2722,8 +2557,8 @@ sub ShowHelp {
             );
          }
 	print qq(
-         <div id="lookUp">
-         <ul>
+         <div>
+         <ul data-role="listview" data-inset="true">
            <li>
              <a href="$this_script?show=help&amp;topic=accessibility">$Lang::string_help_access</a>
            </li>
@@ -2742,7 +2577,8 @@ sub ShowHelp {
     } elsif ($topic eq 'accessibility') {
         PrintHead("$Lang::string_help : $Lang::string_help_access");
 	print qq(
-        <h1>$Lang::string_help : $Lang::string_help_access</h1>
+        $back_button
+        <h2>$Lang::string_help : $Lang::string_help_access</h2>
         );
         if ($Lang::blurb_accessibility) {
             print qq($Lang::blurb_accessibility
@@ -2756,9 +2592,10 @@ sub ShowHelp {
             );
         }
 	print qq(
-        <div id="lookUp">
-          Validation via:
-          <ul>
+          <ul data-role="listview" data-inset="true">
+            <li data-role="list-divider">
+              Validation via:
+            </li>
             <li>
               <a href="http://validator.w3.org/">W3C Markup Validation Service</a>
             </li>
@@ -2773,29 +2610,18 @@ sub ShowHelp {
             </li>
           </ul>
         </div>
-        <div class="center">
-          <img height="31" width="88"
-               src="http://www.w3.org/Icons/valid-html401-blue" 
-               alt="Valid HTML 4.01 Transitional">
-          <img height="31" width="88"
-               src="http://www.w3.org/Icons/valid-css2-blue" 
-               alt="Valid CSS Level 2">
-          <img height="32" width="88" 
-               src="http://www.w3.org/WAI/wcag1A-blue"
-               alt="Level A conformance icon, W3C-WAI Web Content Accessibility Guidelines 1.0">
-        </div>
-        </div>
         );
     } elsif ($topic eq 'boxes') {
         PrintHead("$Lang::string_help");
 	print qq{
-        <h1>$Lang::string_help</h1>
+        <h2>$Lang::string_help</h2>
 	The <b>place holder</b> option displays a box (&quot;<input type="checkbox" />&quot;) beside each entry.  This box can be checked as a reminder of where you are in the list.
         };
     } elsif ($topic eq 'tutorial') {
         PrintHead("$Lang::string_help : $Lang::string_tutorial_link");
 	print qq(
-<h1>$Lang::string_help : $Lang::string_tutorial_link</h1>
+        $back_button
+<h2>$Lang::string_help : $Lang::string_tutorial_link</h2>
         );
         if ($Lang::blurb_tutorial) {
             print qq($Lang::blurb_tutorial);
@@ -2803,12 +2629,11 @@ sub ShowHelp {
 	    print qq{
 <div class="english">
 <ol>
-  <li>Take an iPhone, PDA or other wireless-enabled mobile computing device into the stacks.
+  <li>Take an iPad, or other wireless-enabled mobile computing device into the stacks.
   <li>Grab a book off the shelf and enter its barcode using the barcode entry form.</li>
   <li>Grab another book further down the shelf and enter its barcode.</li>
   <li>Click the "$Lang::string_form_submit" button to generate a shelf list.</li>
-  <li>Select from several list display options.</li>
-  <li>Get more detailed information on a book by clicking on its list number.</li>
+  <li>Get more detailed information on a book by clicking on the call number/title.</li>
   <li>Mark items as desired.</li>
 </ol>
 <strong>More details</strong>
@@ -2816,8 +2641,6 @@ sub ShowHelp {
 Although there is an alternate call number entry form you should use the barcode entry whenever possible.
         <br><br>
 Note that it is only necessary to input the barcodes of two books on either end of a shelf in order to generate a shelf list for all of the items between (and including) those two books.
-        <br><br>
-The shelf list page will display up to 50 items, with a link to additional pages if necessary.
         <br><br>
 From the shelf list page, clicking on an item's list number will take you to an item view page containing more detailed information about the item. 
         <br><br>
@@ -2828,7 +2651,8 @@ From the item view page, it is possible to mark an item by saving data to a mark
     } elsif ($topic eq 'statuses') {
         PrintHead("$Lang::string_help : $Lang::string_help_statuses");
 	print qq(
-	<h1>$Lang::string_help : $Lang::string_help_statuses</h1>
+        $back_button
+	<h2>$Lang::string_help : $Lang::string_help_statuses</h2>
         <div class="english">
 	<dl>
 	  <dd><strong>B</strong> - At <strong>B</strong>indery</dd>
@@ -2849,24 +2673,22 @@ From the item view page, it is possible to mark an item by saving data to a mark
     } elsif ($topic eq 'display') {
         PrintHead("$Lang::string_help");
 	print qq(
-	<h1>$Lang::string_help_list_display</h1>
+	<h2>$Lang::string_help_list_display</h2>
         <p>coming soon!</p>
         );
     } elsif ($topic eq 'random') {
         PrintHead("$Lang::string_help : $Lang::string_help_random_list");
+        my $random_string = CreateRandomString();
 	print qq(
-	<h1>$Lang::string_help : $Lang::string_help_random_list</h1>
+        $back_button
+	<h2>$Lang::string_help : $Lang::string_help_random_list</h2>
 	<form name="random" action="$this_script" method="get" accept-charset="UTF-8">
         <fieldset>
           <legend>$Lang::string_random_legend</legend>
 	    <input type="hidden" name="show" value="random">
-          <div class="formCheckBoxes">
-	    <input type="checkbox" name="charges" id="charges" value="Y" class="checkbox"><label for="charges">$Lang::string_ch_full</label><br>
-	    <input type="checkbox" name="browses" id="browses" value="Y" class="checkbox"><label for="browses">$Lang::string_br_full</label><br>
-	    <input type="checkbox" name="status"  id="status" value="Y" class="checkbox"><label for="status">$Lang::string_st_full</label>
-          </div>
-          <div class="formSubmit">
-	    <input type="submit" class="button" value="$Lang::string_form_submit">
+	    <input type="hidden" name="random_string" value="$random_string">
+          <div>
+	    <input type="submit" class="button" data-inline="true" value="$Lang::string_form_submit">
           </div>
           <div class="clear">
 	    <input type="hidden" name="stpt" value="1">
@@ -2881,9 +2703,9 @@ From the item view page, it is possible to mark an item by saving data to a mark
     } else {
         PrintHead("$Lang::string_help : $Lang::string_help_contents");
 	print qq(
-        <h1>$Lang::string_help : $Lang::string_help_contents</h1>
-        <div id="lookUp">
-        <ul>
+        <h2>$Lang::string_help : $Lang::string_help_contents</h2>
+        <div>
+        <ul data-role="listview" data-inset="true">
           <li>
             <a href="$this_script?show=help&amp;topic=about">$Lang::string_about $this_app</a>
           </li>
@@ -2908,6 +2730,20 @@ From the item view page, it is possible to mark an item by saving data to a mark
 
 
 ##########################################################
+#  CreateRandomString
+##########################################################
+#
+#  Creates a random alpha-numeric ASCII string  
+
+sub CreateRandomString {
+  my @alphanumeric_chars = ("A".."Z","a".."z",0..9);
+  my $random_string = join("", 
+    @alphanumeric_chars[ map {rand @alphanumeric_chars } (1..8) ]);
+  return($random_string)
+}
+
+
+##########################################################
 #  TestPage  
 ##########################################################
 #
@@ -2917,9 +2753,9 @@ sub TestPage {
     PrintHead("$Lang::string_error");
     print qq(
     <div class="margin">
-      <h1 class="error">Test</h1>
+      <h2 class="error">Test</h2>
       <div class="error">$message</div>
-      <div><input type="button" value="$Lang::string_back" class="button" onClick="history.go\(-1\);"></div>
+      <div><input type="button" data-icon="arrow-l" data-inline="true" value="$Lang::string_back" class="button" onClick="history.go\(-1\);"></div>
     </div>
     );
     PrintTail();
@@ -2937,10 +2773,10 @@ sub ErrorPage {
     my ($error) = @_;
     PrintHead("$Lang::string_error");
     print qq(
-    <div class="margin">
-      <h1 class="error">$Lang::string_error</h1>
+    <div>
+      <h2 class="error">$Lang::string_error</h2>
       <div class="error">$error</div>
-      <div><input type="button" value="$Lang::string_back" class="button" onClick="history.go\(-1\);"></div>
+      <div><input type="button" data-icon="arrow-l" data-inline="true" value="$Lang::string_back" class="button" onClick="history.go\(-1\);"></div>
     </div>
     );
     PrintTail();
