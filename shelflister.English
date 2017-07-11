@@ -1,0 +1,215 @@
+package Lang;
+
+###############################################################################
+#                                                                             #
+#  ShelfLister, Version 2.0 for Unix                                          #
+#                                                                             #
+#  Language module: English                                                   #
+#                                                                             #
+#  Michael Doran, doran@uta.edu                                               #
+#                                                                             #
+#  University of Texas at Arlington Library                                   #
+#  Box 19497, Arlington, TX 76019, USA                                        #
+#                                                                             #
+#  More information at: http://rocky.uta.edu/doran/shelflister/               #
+#                                                                             #
+###############################################################################
+#                                                                             #
+#  Copyright 2003-2009, The University of Texas at Arlington ("UTA").         #
+#  All rights reserved.  See included shelflister.LICENSE for details.        #
+#                                                                             #
+###############################################################################
+
+use Encode;
+
+###############################################################################
+# 
+#  Advice on editing this configuration file
+#
+#  The uncommented lines of this file are actual Perl code that gets
+#  incorporated into the main shelflister.cgi script.  That means that they
+#  have to observe the proper Perl syntax.  As with any code, a seemingly
+#  minor syntax error can cause the program to fail.
+#
+#  Before editing this file, make a backup copy.  That way, if you make an
+#  inadvertant syntax error (and can't figure out what it is), you can
+#  always revert back to your known good backup copy.
+# 
+#  Editing this configuration file involves changing the values being
+#  assigned to variables.  For the most part, this will take the form of:
+#      $variable = "value";
+#  I.e., the variable will be prefaced with a "$" and the value will be
+#  enclosed in quotes.
+# 
+#  Some values will be enclosed by double quotes and some by single quotes.
+#  Note also that Perl quote syntax can take multiple forms, e.g.:  
+#  
+#  Double quote sytax:
+#     $variable = "value";
+#            or
+#     $variable = qq(value);
+#
+#  Single quote syntax:
+#     $variable = 'value';
+#            or
+#     $variable = q(value);
+#
+#  Do not arbitrarily change the quote syntax unless you know what you
+#  are doing.  For more about Perl quotes and quote-like operators,
+#  refer to:  
+#    http://perldoc.perl.org/perlop.html#Quote-and-Quote-like-Operators
+# 
+###############################################################################
+#
+#  Unicode UTF-8 encoded values can be assigned to these variables.
+#
+#  To avoid mangling those values during later processing in the script,
+#  we must let Perl know that they *are* UTF-8 encoded.  We do this by
+#  applying the 'decode_utf8' function to our string.  If your values are
+#  plain ASCII, or if you prefer to use character entity references for
+#  diacritic characters, the decode function does no harm.
+#
+###############################################################################
+
+##########################################################
+#  Language code 
+##########################################################
+#
+#  Used in HTML "lang" attribute 
+#  per http://www.w3.org/TR/html401/struct/dirlang.html
+
+$language_code  = "en-US";
+
+
+##########################################################
+#  Navigation 
+##########################################################
+
+$string_search   = decode_utf8("Start");
+$string_help     = decode_utf8("Help");
+$string_next     = decode_utf8("Next");
+$string_prev     = decode_utf8("Previous");
+
+
+##########################################################
+#  Barcode and call number entry forms 
+##########################################################
+
+$string_search_h1        = decode_utf8("Get a Shelf List");
+$string_bc_legend        = decode_utf8("By Barcode");
+$string_bc_start         = decode_utf8("Barcode start:");
+$string_bc_end           = decode_utf8("Barcode end:");
+$string_callno_legend    = decode_utf8("By Call Number");
+$string_callno_start     = decode_utf8("Call number start:");
+$string_callno_end       = decode_utf8("Call number end:");
+$string_callno_location  = decode_utf8("Location:");
+$string_callno_class     = decode_utf8("Classification:");
+$string_form_submit      = decode_utf8("Get List");     
+
+##########################################################
+#  Shelf List 
+##########################################################
+
+$string_shelf_list       = decode_utf8("Shelf List");
+$string_shelf_list_table = decode_utf8("This table is a shelf list with selected data.");
+$string_location         = decode_utf8("Location:");
+$string_call_no          = decode_utf8("Call Numbers");
+$string_call_no_blurb    = decode_utf8("Switch to Call Numbers display");
+$string_titles           = decode_utf8("Titles");
+$string_titles_blurb     = decode_utf8("Switch to Titles display");
+$string_callno_plus_tog  = decode_utf8("Toggle on/off item enumeration, chronology, year, and copy number");
+$string_mouse_over_tog   = decode_utf8("Toggle on/off mouse-over of titles/call numbers");
+$string_number_abbrev    = decode_utf8("#");
+$string_number_full      = decode_utf8("Results number and link to record information");
+$string_ch_abbrev        = decode_utf8("Ch");
+$string_ch_full          = decode_utf8("Charges");
+$string_br_abbrev        = decode_utf8("Br");
+$string_br_full          = decode_utf8("Browses");
+$string_st_abbrev        = decode_utf8("St");
+$string_st_full          = decode_utf8("Item status");
+$string_checkbox         = decode_utf8("Select to mark or mail");
+
+##########################################################
+#  Settings - Include descriptions 
+##########################################################
+
+# These descriptions must correspond with values
+# specified in shelflister.ini
+#$cnplus   = decode_utf8("Call number +");
+#$boxes    = decode_utf8("Place holders");
+
+################################################################
+#  Marked item statuses
+################################################################
+#  These are the different statuses that you might want to mark
+#  records as.   These will likely be similar to the values for
+#  Voyager item statuses, but don't have to be.
+
+#  UNCOMMENT THIS ARRAY LIST VARIABLE ONLY IF YOU WANT A
+#  LANGUAGE-SPECIFIC SELECTION TO SUPERCEDE THE ARRAY VALUES
+#  SPECIFIED IN THE SHELFLISTER.INI CONFIG FILE.
+
+#@save_stati = (
+#        decode_utf8("Send to Uranus"),
+#        decode_utf8("Weed"),
+#        decode_utf8("Missing"),
+#        decode_utf8("Circ Review"),
+#        decode_utf8("Cat Review"),
+#        decode_utf8("Lost"),
+#        decode_utf8("Damaged"),
+#        decode_utf8("Other")
+#        );
+
+##########################################################
+#  Item View 
+##########################################################
+
+$string_item_view          = decode_utf8("Item View");
+$string_back               = decode_utf8("&lt; Back");
+$string_mark_status_label  = decode_utf8("Mark as:");
+$string_barcode            = decode_utf8("barcode");
+$string_item_note          = decode_utf8("Item note");
+$string_look_up_in         = decode_utf8("Look up in:");
+$string_no_item_record     = decode_utf8("No item record");
+$voyager_record_link_text  = decode_utf8("Catalog");
+$worldcat_record_link_text = decode_utf8("WorldCat");
+$google_record_link_text   = decode_utf8("Google Books");
+
+##########################################################
+#  Error messages 
+##########################################################
+
+$string_error             = decode_utf8("Error");
+$string_bc_bad_pre        = decode_utf8("Incorrect barcode?");
+$string_bc_bad_post       = decode_utf8("Please check input and resubmit.");
+$string_cn_error          = decode_utf8("Call number error:");
+$string_no_results        = decode_utf8("No results");
+$string_no_results_desc   = decode_utf8("Check input and try again.");
+$string_no_results_loc    = decode_utf8("Did you select the appropriate location?");
+$string_loc_mismatch      = decode_utf8("Location mismatch");
+$string_loc_mismatch_desc = decode_utf8(qq(The items whose barcodes have been entered do not share the same location code. Perhaps one of them is misshelved? Note that this application is not designed to accomodate collections where items with different location codes are interleaved on the same shelf.));
+$string_random_fail       = decode_utf8("Unable to generate a random list - please try again.");
+
+##########################################################
+#  Help
+##########################################################
+
+$string_about             = decode_utf8("About");
+$string_help_contents     = decode_utf8("Contents");
+$string_copyright         = decode_utf8("Copyright");
+$string_help_list_display = decode_utf8("Shelf list display options");
+$string_tutorial_link     = decode_utf8("Tutorial");
+$string_help_statuses     = decode_utf8("Item status abbreviations");
+$string_mif_file          = decode_utf8("Marked items file");
+$string_help_access       = decode_utf8("Accessibility");
+$string_help_random_list  = decode_utf8("Generate a random list");
+$string_random_legend     = decode_utf8("Beta");
+
+###############################################################################
+#  Do not edit below here.                                                    # 
+###############################################################################
+
+1;
+
+__END__
+
