@@ -207,7 +207,7 @@ my $query = new CGI;
 ##########################################################
 
 # Language of user interface
-my $language            = decode_utf8($query->param('lang'));
+my $language            = decode_utf8(scalar scalar $query->param('lang'));
 
 LoadLanguageModule($language);
 
@@ -225,33 +225,33 @@ if (@Lang::save_stati) {
 }
  
 my $list_display        = '';
-$list_display           = decode_utf8($query->param('mode'));
+$list_display           = decode_utf8(scalar scalar $query->param('mode'));
 if (! $list_display) {
     $list_display        = $ShelfListerIni::list_display_default;
 }
 
-my $mouse_over          = decode_utf8($query->param('omoo'));
+my $mouse_over          = decode_utf8(scalar scalar $query->param('omoo'));
 
 # Input from Search Form 1 - Barcode entry
 
-my $barcode_start       = decode_utf8($query->param('bcs'));
-my $barcode_end         = decode_utf8($query->param('bce'));
+my $barcode_start       = decode_utf8(scalar scalar $query->param('bcs'));
+my $barcode_end         = decode_utf8(scalar scalar $query->param('bce'));
 
 # Input from Search Form 2 - Call Number entry
 
-my $location_id         = decode_utf8($query->param('loc_id'));
-my $call_num_start      = decode_utf8($query->param('cns'));
-my $call_num_end        = decode_utf8($query->param('cne'));
-my $classification      = decode_utf8($query->param('class_type'));
+my $location_id         = decode_utf8(scalar scalar $query->param('loc_id'));
+my $call_num_start      = decode_utf8(scalar scalar $query->param('cns'));
+my $call_num_end        = decode_utf8(scalar scalar $query->param('cne'));
+my $classification      = decode_utf8(scalar scalar $query->param('class_type'));
 unless ($classification) {
     $classification     = 'LC';
 }
 
 # Input from both Search Forms
 
-my $search_type         = decode_utf8($query->param('search'));
-my $show_boxes          = decode_utf8($query->param('boxes'));
-my $starting_pnt        = decode_utf8($query->param('stpt'));
+my $search_type         = decode_utf8(scalar scalar $query->param('search'));
+my $show_boxes          = decode_utf8(scalar $query->param('boxes'));
+my $starting_pnt        = decode_utf8(scalar $query->param('stpt'));
 
 # Formerly Search Forms input; now ini file config
 
@@ -259,7 +259,7 @@ my $show_charge_stats   = decode_utf8($ShelfListerIni::charges);
 my $show_browse_stats  	= decode_utf8($ShelfListerIni::browses);
 my $show_item_status    = decode_utf8($ShelfListerIni::status);
 
-my $show_callno_plus    = decode_utf8($query->param('cnplus'));
+my $show_callno_plus    = decode_utf8(scalar $query->param('cnplus'));
 if ($show_callno_plus ne 'Y' && $show_callno_plus ne 'N') {
     $show_callno_plus    = decode_utf8($ShelfListerIni::cnplus);
 }
@@ -267,7 +267,7 @@ if ($show_callno_plus ne 'Y' && $show_callno_plus ne 'N') {
 $starting_pnt =~ s/\D//g;
 
 # Input from Random Test 
-my $random_item_id      = $query->param('itemid');
+my $random_item_id      = scalar $query->param('itemid');
 
 #  Browser detection
 #  This part could use some more work.
@@ -280,14 +280,14 @@ my $ending_pnt          = $starting_pnt + $recs_per_page - 1;
 
 # Input for Item View
 
-my $record_type         = decode_utf8($query->param('record_type'));
-my $record_number       = decode_utf8($query->param('record_no'));
+my $record_type         = decode_utf8(scalar $query->param('record_type'));
+my $record_number       = decode_utf8(scalar $query->param('record_no'));
 
 # Input for misc. views
 
-my $topic               = decode_utf8($query->param('topic'));
-my $show_page           = decode_utf8($query->param('show'));
-my @checked_records     = decode_utf8($query->param('check'));
+my $topic               = decode_utf8(scalar $query->param('topic'));
+my $show_page           = decode_utf8(scalar $query->param('show'));
+my @checked_records     = decode_utf8(scalar $query->param('check'));
 
 # De-dup and sort the list of checked records
 # (Legacy code, not currently used in ShelfLister.)
@@ -302,13 +302,13 @@ if (@checked_records) {
 
 # Input for saving to file
 
-my $save_action              = decode_utf8($query->param('save_action'));
-my $save_status              = decode_utf8($query->param('save_status'));
-my $save_bib_id              = decode_utf8($query->param('save_bib_id'));
-my $save_mfhd_id             = decode_utf8($query->param('save_mfhd_id'));
-my $save_item_id             = decode_utf8($query->param('save_item_id'));
-my $save_barcode             = decode_utf8($query->param('save_barcode'));
-my $save_call_no             = decode_utf8($query->param('save_call_no'));
+my $save_action              = decode_utf8(scalar $query->param('save_action'));
+my $save_status              = decode_utf8(scalar $query->param('save_status'));
+my $save_bib_id              = decode_utf8(scalar $query->param('save_bib_id'));
+my $save_mfhd_id             = decode_utf8(scalar $query->param('save_mfhd_id'));
+my $save_item_id             = decode_utf8(scalar $query->param('save_item_id'));
+my $save_barcode             = decode_utf8(scalar $query->param('save_barcode'));
+my $save_call_no             = decode_utf8(scalar $query->param('save_call_no'));
 
 if      ($show_page eq 's1') {
     PrintSearchForm("s1");
